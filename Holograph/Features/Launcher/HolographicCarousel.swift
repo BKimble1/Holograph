@@ -17,16 +17,20 @@ struct HolographicCarousel: View {
 
     @Environment(HoloMotion.self) private var motion
 
+    /// The stage's own coordinate space. Depth is measured against this rather
+    /// than `.scrollView`, whose origin does not track the visible centre.
+    private static let stageSpace = "holograph.carousel.stage"
+
     /// Gap between tile slots. Slots stay a constant width; neighbours shrink
     /// visually, which is what opens up the space seen in the design.
     private var spacing: CGFloat { tileSize * 0.16 }
 
     var body: some View {
-        GeometryReader { proxy in
-            let containerWidth = proxy.size.width
+        GeometryReader { stage in
+            let containerWidth = stage.size.width
             let sideInset = max(0, (containerWidth - tileSize) / 2)
 
-            ScrollViewReader { proxy in
+            ScrollViewReader { scroller in
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: spacing) {
                         ForEach(items) { item in
@@ -46,10 +50,11 @@ struct HolographicCarousel: View {
                 .task(id: items.map(\.id)) {
                     guard let selectedID else { return }
                     await Task.yield()
-                    proxy.scrollTo(selectedID, anchor: .center)
+                    scroller.scrollTo(selectedID, anchor: .center)
                 }
             }
         }
+        .coordinateSpace(.named(Self.stageSpace))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.carousel)
         .accessibilityLabel("App carousel")
@@ -80,7 +85,7 @@ struct HolographicCarousel: View {
         .frame(width: size, height: size)
         .visualEffect { content, geometry in
             let offset = HolographicCarousel.normalisedOffset(
-                midX: geometry.frame(in: .scrollView(axis: .horizontal)).midX,
+                midX: geometry.frame(in: .named(HolographicCarousel.stageSpace)).midX,
                 containerWidth: containerWidth,
                 slotWidth: slotWidth
             )

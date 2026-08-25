@@ -5,8 +5,9 @@ final class LauncherFlowUITests: LauncherUITestCase {
         launchApp(seed: .demoApps, animations: .holdIntro)
 
         XCTAssertTrue(loadingScreen.waitForExistence(timeout: 20), "The app should open on the loading screen")
+        let credit = app.descendants(matching: .any)[AccessibilityIdentifiers.poweredByIdlery].firstMatch
         XCTAssertTrue(
-            app.descendants(matching: .any)[AccessibilityIdentifiers.poweredByIdlery].firstMatch.exists,
+            credit.waitForExistence(timeout: 10),
             "The loading screen carries the Idlery credit"
         )
 

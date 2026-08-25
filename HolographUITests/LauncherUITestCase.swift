@@ -79,8 +79,12 @@ class LauncherUITestCase: XCTestCase {
         app.descendants(matching: .any)["settings.row.\(name)"].firstMatch
     }
 
+    /// A row's "…" menu. SwiftUI does not reliably surface the accessibility
+    /// identifier it is given on a `Menu`, but the label always comes through.
     func rowMenu(_ name: String) -> XCUIElement {
-        app.descendants(matching: .any)["settings.row.menu.\(name)"].firstMatch
+        let byIdentifier = app.descendants(matching: .any)["settings.row.menu.\(name)"].firstMatch
+        if byIdentifier.exists { return byIdentifier }
+        return app.descendants(matching: .any)["Actions for \(name)"].firstMatch
     }
 
     /// Settings is a form sheet; the lower sections need scrolling into view
