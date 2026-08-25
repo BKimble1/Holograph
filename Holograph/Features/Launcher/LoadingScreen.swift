@@ -36,9 +36,13 @@ struct LoadingScreen: View {
         }
         .background(HoloTheme.backgroundDeep)
         .ignoresSafeArea(edges: .top)
-        .accessibilityIdentifier(AccessibilityID.loadingScreen)
+        // Element first, then describe it. Applied the other way round the
+        // identifier has no element to land on yet, so it propagates to every
+        // descendant and stamps itself over the credit's own identifier — which
+        // is exactly why the credit could be photographed but never found.
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Holograph is starting")
+        .accessibilityIdentifier(AccessibilityID.loadingScreen)
         .onAppear {
             withAnimation(entrance) { hasAppeared = true }
         }

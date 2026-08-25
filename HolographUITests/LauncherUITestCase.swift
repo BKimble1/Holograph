@@ -55,8 +55,13 @@ class LauncherUITestCase: XCTestCase {
         return application
     }
 
+    /// The intro screen, by identifier or by its label. A container element is
+    /// the least predictable thing to query for, so both are accepted.
     var loadingScreen: XCUIElement {
-        app.descendants(matching: .any)[AccessibilityIdentifiers.loadingScreen].firstMatch
+        let byIdentifier = app.descendants(matching: .any)[AccessibilityIdentifiers.loadingScreen].firstMatch
+        if byIdentifier.exists { return byIdentifier }
+        let byLabel = app.descendants(matching: .any)["Holograph is starting"].firstMatch
+        return byLabel.exists ? byLabel : byIdentifier
     }
 
     // MARK: - Element accessors
