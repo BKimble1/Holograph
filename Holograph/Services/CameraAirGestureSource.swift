@@ -267,54 +267,94 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
         }
     }
 
-    /// Reduces a hand to the two numbers the detector needs, both measured
-    /// against the hand's own size so distance from the camera drops out.
+    /// Reduces a hand to what the detector needs, measured against the hand's
+    /// own size so distance from the camera drops out.
     ///
-    /// Position comes from the wrist and knuckles rather than a fingertip:
-    /// knuckles stay put while fingers curl, so it follows the hand rather than
-    /// whatever shape the fingers are making. The knuckle span is the ruler —
-    /// it is the one measurement on a hand that barely changes as the fingers
-    /// move, which is exactly what a scale reference has to be.
+    /// Position comes from the wrist and knuckles, never a fingertip: knuckles
+    /// stay put while fingers curl, so it follows the hand rather than whatever
+    /// shape the fingers are making. The knuckle span is the ruler — the one
+    /// measurement on a hand that barely changes as the fingers move.
+    ///
+    /// Fingertips are read separately and allowed to fail. A hand mid-flick is
+    /// motion-blurred and its fingertips are the first landmarks to drop below
+    /// confidence; insisting on them would discard the whole reading exactly
+    /// when a swipe is happening, which is precisely how swipes stopped
+    /// registering.
     static func reading(
         from observation: VNHumanHandPoseObservation,
         aspect: Double,
         minimumConfidence: Float
     ) -> HandReading? {
-        func point(_ joint: VNHumanHandPoseObservation.JointName) -> CGPoint? {
+        func point(
+            _ joint: VNHumanHandPoseObservation.JointName,
+            confidence: Float = minimumConfidence
+        ) -> CGPoint? {
             guard let found = try? observation.recognizedPoint(joint),
-                  found.confidence >= minimumConfidence else { return nil }
+                  found.confidence >= confidence else { return nil }
             // Stretch x by the aspect ratio so both axes are in the same units.
             return CGPoint(x: found.location.x * aspect, y: found.location.y)
         }
 
         let knuckleJoints: [VNHumanHandPoseObservation.JointName] =
             [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
-        let knuckles = knuckleJoints.compactMap(point)
+        let knuckles = knuckleJoints.compactMap { point($0) }
         // One landmark is not a hand; it is a knuckle-shaped false positive.
         guard knuckles.count >= 2 else { return nil }
 
-        guard let index = point(.indexMCP), let little = point(.littleMCP) else { return nil }
-        let span = hypot(index.x - little.x, index.y - little.y)
-        // A hand seen edge-on has almost no span, and dividing by it would turn
-        // a twitch into a swipe.
-        guard span > 0.02 else { return nil }
-
+        guard let span = span(from: observation, point: point) else { return nil }
         let centreX = knuckles.map(\.x).reduce(0, +) / Double(knuckles.count)
 
+        return HandReading(
+            x: centreX / span,
+            spread: spread(from: observation, span: span, point: point)
+        )
+    }
+
+    /// The hand's width, in the frame's own units.
+    ///
+    /// Across the knuckles when both edges are visible; from the wrist to the
+    /// middle knuckle otherwise, which is about a fifth longer than the hand is
+    /// wide. Having a fallback matters: losing the ruler loses the reading.
+    private static func span(
+        from observation: VNHumanHandPoseObservation,
+        point: (VNHumanHandPoseObservation.JointName, Float) -> CGPoint?
+    ) -> Double? {
+        var measured: Double?
+        if let index = point(.indexMCP, 0.5), let little = point(.littleMCP, 0.5) {
+            measured = hypot(index.x - little.x, index.y - little.y)
+        } else if let wrist = point(.wrist, 0.5), let middle = point(.middleMCP, 0.5) {
+            measured = hypot(wrist.x - middle.x, wrist.y - middle.y) / 1.2
+        }
+        // A hand seen edge-on has almost no span, and dividing by it would turn
+        // a twitch into a swipe.
+        guard let measured, measured > 0.02 else { return nil }
+        return measured
+    }
+
+    /// How far the fingertips sit from their own centre, in spans, or `nil` when
+    /// too few of them can be seen to tell an open hand from a closed one.
+    ///
+    /// The confidence bar is lower here than for the knuckles on purpose:
+    /// gathered fingertips overlap one another, which is exactly the pose the
+    /// burst has to recognise and the one Vision is least sure about.
+    private static func spread(
+        from observation: VNHumanHandPoseObservation,
+        span: Double,
+        point: (VNHumanHandPoseObservation.JointName, Float) -> CGPoint?
+    ) -> Double? {
         let tipJoints: [VNHumanHandPoseObservation.JointName] =
             [.thumbTip, .indexTip, .middleTip, .ringTip, .littleTip]
-        let tips = tipJoints.compactMap(point)
-        // Fewer than four fingertips cannot say whether a hand is open or shut.
-        guard tips.count >= 4 else { return nil }
-        let tipCentre = CGPoint(
+        let tips = tipJoints.compactMap { point($0, 0.4) }
+        guard tips.count >= 3 else { return nil }
+
+        let centre = CGPoint(
             x: tips.map(\.x).reduce(0, +) / Double(tips.count),
             y: tips.map(\.y).reduce(0, +) / Double(tips.count)
         )
-        let spread = tips
-            .map { hypot($0.x - tipCentre.x, $0.y - tipCentre.y) }
+        let mean = tips
+            .map { hypot($0.x - centre.x, $0.y - centre.y) }
             .reduce(0, +) / Double(tips.count)
-
-        return HandReading(x: centreX / span, spread: spread / span)
+        return mean / span
     }
 }
 

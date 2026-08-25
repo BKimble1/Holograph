@@ -120,24 +120,38 @@ and kept upright as the iPad turns.
 
 ### Measured in hands, not in pixels
 
-The same six-inch flick covers about half the frame at a foot and a quarter of
-it at two, so a threshold in frame-fractions means a different gesture at every
+The same flick covers about twice as much of the frame at a foot as it does at
+two, so a threshold in frame-fractions means a different gesture at every
 distance. Every threshold here is instead expressed in **knuckle spans** — the
-width of the hand across the index and little-finger knuckles, about 3.3 inches,
-and the one measurement on a hand that barely changes as the fingers move. A
-six-inch flick is 1.8 spans whether you are close or far.
+width of the hand across the index and little-finger knuckles, about three
+inches, and the one measurement on a hand that barely changes as the fingers
+move. A four-inch flick is 1.2 spans whether you are close or far.
 
-The same ruler gives the burst: fingertip spread is measured in spans too, so
-gathered fingers read low and a thrown-open hand reads high regardless of
-distance.
+The same ruler gives the burst: fingertip spread is measured in spans, so
+gathered fingers read about 0.13 and a fully splayed hand about 0.69 — numbers
+worth knowing, because a threshold set above what a hand can reach is a gesture
+that never fires.
+
+### A swipe needs knuckles, not fingertips
+
+A hand mid-flick is motion-blurred, and fingertips are the first landmarks to
+fall below confidence. Position and scale come from the wrist and knuckles
+alone, and the fingertip spread is optional — a reading without it still drives
+a swipe, and only the burst goes without. Tying the two together is what makes
+swipes stop registering exactly when one is being made.
 
 ### What counts
 
 `AirGestureDetector` decides, from how far the hand crossed, how fast, and how
 straight the path was. Reversing is treated differently from repeating: after a
 flick the hand has to come back, and that return journey is not a gesture — it
-is the cost of having made one. So the same flick counts again quickly, while
-the opposite one has to wait long enough to be meant.
+is the cost of having made one.
+
+The way back is refused by watching for the hand to **come to rest**, not by
+running down a clock. A return stroke is one continuous movement and never
+pauses; deliberately changing your mind does. That means the flick itself can
+stay easy — four inches, briskly — without the journey home undoing it, which a
+plain cooldown cannot manage in both directions at once.
 
 It is a value type over plain numbers, so all of it is unit-tested by playing a
 hand through it frame by frame, with distances written in inches: a six-inch
@@ -163,15 +177,16 @@ Two accents, both on by default and both switchable in Settings:
   a seeded generator, so the sound is identical every time and its shape is
   unit-tested directly: how quickly it peaks, how fast it collapses, and that the
   attack is broadband rather than a pitch.
-- **"Opening <app>" as one launches**, in a woman's voice, unhurried and level.
-  `HoloVoice` ranks the installed voices — a woman first, then British, then the
-  particular voice, then the quality of the recording. Gender comes from a list
-  of Apple's own voice names before the API's `gender`, because plenty of
-  installed voices report none at all, and a stock British device that has only
-  Daniel installed will otherwise hand you a man. For the best result, download
-  an English (UK) voice such as Serena under **Settings → Accessibility → Spoken
-  Content → Voices**. A refused launch cancels the announcement, so the voice
-  never contradicts the recovery alert.
+- **"Opening <app>" as one launches**, in a British man's voice — measured, dry,
+  and a little slower and lower than default. `HoloVoice` ranks the installed
+  voices: a man first, then British, then the particular voice, then the quality
+  of the recording. Gender comes from a list of Apple's own voice names before
+  the API's `gender`, which reports `.unspecified` for plenty of installed
+  voices and so cannot be relied on alone. For the best result, download
+  **Daniel (Enhanced or Premium)** under Settings → Accessibility → Spoken
+  Content → Voices → English (UK); the enhanced recording is markedly less
+  synthetic. A refused launch cancels the announcement, so the voice never
+  contradicts the recovery alert.
 
 The session is `.playback` with `.mixWithOthers`. `.ambient` would be the politer
 category, but it is silenced by the Ring/Silent switch — the Control Centre

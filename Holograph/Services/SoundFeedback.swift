@@ -190,8 +190,8 @@ enum HoloClick {
 
 // MARK: - The voice
 
-/// Picks the voice the launcher speaks in: a woman, British if the device has
-/// one — composed and unhurried rather than bright and quick.
+/// Picks the voice the launcher speaks in: a British man, measured and dry —
+/// the register of an assistant who has already done the thinking.
 ///
 /// The choice is made over plain descriptions rather than `AVSpeechSynthesisVoice`
 /// so the ranking can be tested. Which voices exist depends on the device and on
@@ -210,35 +210,37 @@ enum HoloVoice {
         let language: String
         let reportedGender: ReportedGender
         /// AVSpeechSynthesisVoiceQuality's raw value: default 1, enhanced 2,
-        /// premium 3. Higher sounds markedly less synthetic.
+        /// premium 3. Higher sounds markedly less synthetic, which matters more
+        /// here than anywhere else — the whole effect is the delivery.
         let quality: Int
     }
 
     /// Apple's English voices, by name.
     ///
     /// The API's own gender is not enough: plenty of installed voices report
-    /// `.unspecified`, and when nothing looks female the ranking falls through
-    /// to whatever else is installed — which on a stock British device is
-    /// Daniel, a man. Naming them is what stops that.
+    /// `.unspecified`, so a ranking that trusts it alone ends up choosing on
+    /// quality and accent and taking whoever happens to be there. Naming them is
+    /// what makes the choice deliberate.
+    static let maleNames: Set<String> = [
+        "Daniel", "Oliver", "Arthur", "Malcolm", "Graham",
+        "Alex", "Fred", "Tom", "Aaron", "Rishi", "Gordon", "Lee",
+    ]
+
     static let femaleNames: Set<String> = [
         "Serena", "Stephanie", "Kate", "Martha", "Fiona", "Emily",
         "Samantha", "Ava", "Allison", "Susan", "Zoe", "Nicky",
         "Karen", "Catherine", "Moira", "Tessa",
     ]
 
-    static let maleNames: Set<String> = [
-        "Daniel", "Oliver", "Arthur", "Malcolm", "Graham",
-        "Alex", "Fred", "Tom", "Aaron", "Rishi", "Gordon", "Lee",
-    ]
+    /// British men, best first. Daniel is Apple's long-standing Received
+    /// Pronunciation voice and by far the closest thing on the device to the
+    /// unhurried English butler the brief asks for.
+    static let preferredNames = ["Daniel", "Oliver", "Arthur", "Graham", "Malcolm"]
 
-    /// British women, best first. The API cannot say which of two voices sounds
-    /// like a composed assistant and which sounds like a station announcement.
-    static let preferredNames = ["Serena", "Stephanie", "Kate", "Martha"]
-
-    static func isFemale(_ candidate: Candidate) -> Bool {
-        if maleNames.contains(candidate.name) { return false }
-        if femaleNames.contains(candidate.name) { return true }
-        return candidate.reportedGender == .female
+    static func isMale(_ candidate: Candidate) -> Bool {
+        if femaleNames.contains(candidate.name) { return false }
+        if maleNames.contains(candidate.name) { return true }
+        return candidate.reportedGender == .male
     }
 
     /// Picks the best available voice, or `nil` to let the system choose.
@@ -252,14 +254,14 @@ enum HoloVoice {
 
     /// Higher sorts better.
     ///
-    /// Being a woman outranks the accent, deliberately. A British man is not a
-    /// closer match to what was asked for than a woman who is not British, and
-    /// a stock device often has no British woman installed at all.
+    /// Being a man outranks the accent: an English-speaking man is a nearer miss
+    /// than a British woman, and a device with no British voice installed should
+    /// still sound like the same character.
     private static func rank(_ candidate: Candidate) -> [Int] {
         let namePreference = preferredNames.firstIndex(of: candidate.name)
             .map { preferredNames.count - $0 } ?? 0
         return [
-            isFemale(candidate) ? 1 : 0,
+            isMale(candidate) ? 1 : 0,
             candidate.language.hasPrefix("en-GB") ? 1 : 0,
             namePreference,
             candidate.quality,
@@ -310,8 +312,10 @@ final class SystemSound: SoundPlaying {
         utterance.voice = preferredVoice()
         // Unhurried and level. The default rate clips along, and a raised pitch
         // reads as eager; neither is the register wanted here.
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.92
-        utterance.pitchMultiplier = 0.96
+        // Slower and a shade lower than default. The character is composure:
+        // nothing it says is news to it.
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.90
+        utterance.pitchMultiplier = 0.92
         utterance.postUtteranceDelay = 0
         utterance.volume = 0.95
         synthesizer.speak(utterance)

@@ -267,7 +267,7 @@ struct SettingsSheet: View {
         } header: {
             Text("Sound")
         } footer: {
-            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing.\n\nFor the voice, download an English (UK) voice such as Serena under Settings → Accessibility → Spoken Content → Voices. Holograph picks the best one installed.")
+            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing.\n\nFor the voice, download Daniel (Enhanced or Premium) under Settings → Accessibility → Spoken Content → Voices → English (UK). Holograph picks the best one installed, and the enhanced recording is markedly less synthetic.")
         }
     }
 
