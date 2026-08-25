@@ -38,10 +38,27 @@ struct HolographicIconView: View {
                 .blur(radius: size * 0.16)
                 .opacity((0.10 + 0.34 * intensity) * boost)
 
-            // 2. The app's own artwork, untouched.
+            // 2. The pane of glass the artwork sits inside. Icons with
+            //    transparency — the demo set, most exported artwork — read as a
+            //    lit tile rather than a symbol floating on the backdrop. A
+            //    full-bleed icon simply covers it.
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.07, green: 0.21, blue: 0.34),
+                            Color(red: 0.02, green: 0.07, blue: 0.15)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .opacity(0.62 + 0.18 * intensity)
+
+            // 3. The app's own artwork, untouched.
             IconArtworkView(item: item, size: size)
 
-            // 3. A pane of cyan glass over it.
+            // 4. A cyan sheen across the glass.
             shape
                 .fill(
                     LinearGradient(
@@ -58,19 +75,19 @@ struct HolographicIconView: View {
                 .opacity(glassOpacity)
                 .blendMode(.screen)
 
-            // 4. Scan lines drifting slowly down the glass.
+            // 5. Scan lines drifting slowly down the glass.
             ScanLineOverlay(spacing: max(3, size * 0.026), phase: scanPhase(time: time))
                 .mask { shape }
                 .opacity(0.16 * intensity)
                 .blendMode(.plusLighter)
 
-            // 5. A single soft shimmer sweeping diagonally.
+            // 6. A single soft shimmer sweeping diagonally.
             ShimmerBand(progress: shimmerProgress(time: time), size: size)
                 .mask { shape }
                 .opacity((0.5 + 0.5 * launchProgress) * intensity)
                 .blendMode(.plusLighter)
 
-            // 6. The illuminated edge.
+            // 7. The illuminated edge.
             shape
                 .strokeBorder(
                     LinearGradient(
@@ -86,7 +103,7 @@ struct HolographicIconView: View {
                 )
                 .opacity(0.35 + 0.6 * intensity)
 
-            // 7. An inner hairline that sells the thickness of the glass.
+            // 8. An inner hairline that sells the thickness of the glass.
             shape
                 .inset(by: size * 0.028)
                 .strokeBorder(HoloTheme.cyanBright.opacity(0.22 * intensity), lineWidth: max(0.5, size * 0.003))
