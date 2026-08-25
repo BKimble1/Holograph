@@ -1,0 +1,29 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcresult/
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# Secrets — never commit signing material
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+ExportOptions.plist
+
+# Python tooling
+__pycache__/
+*.pyc

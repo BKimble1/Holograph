@@ -1,0 +1,154 @@
+# Idlery Launcher
+
+An iPad-only holographic launcher. One immersive screen, a carousel of your own
+app icons rendered behind cyan glass, and a tap that opens the real app.
+
+- **Product name** Idlery Launcher · **Display name** Launcher
+- **Bundle identifier** `com.idlery.launcher`
+- **Platform** iPadOS 17+, iPad only (`TARGETED_DEVICE_FAMILY = 2`)
+- **Lifecycle** SwiftUI · **Language** Swift 6 · **Dependencies** none
+
+Selected apps stay separate, installed apps. Tapping a tile plays a short portal
+animation and then hands the app's registered deep link to iPadOS. Nothing is
+embedded, nothing is enumerated.
+
+---
+
+## Getting started
+
+```bash
+open IdleryLauncher.xcodeproj
+```
+
+Choose the **IdleryLauncher** scheme and an iPad simulator or device. On first
+run the launcher seeds five clearly-labelled demo tiles so the stage is never
+blank; delete them and they stay gone.
+
+To add your own app you need the URL scheme it registers with iPadOS — see
+[`DEEP_LINK_INTEGRATION.md`](DEEP_LINK_INTEGRATION.md).
+
+### Regenerating the Xcode project
+
+`IdleryLauncher.xcodeproj` is generated from the file tree so adding a source
+file never means hand-editing a `pbxproj`:
+
+```bash
+python3 Scripts/generate_xcodeproj.py   # after adding or removing files
+python3 Scripts/validate_pbxproj.py     # structural check
+python3 Scripts/swift_sanity_check.py   # lexical check across all Swift sources
+```
+
+CI fails if the committed project is out of step with the source tree.
+
+---
+
+## How it is put together
+
+```
+IdleryLauncher/
+├── App/                  Composition root, launch arguments, scene wiring
+├── Models/               LauncherItem — the Sendable snapshot the UI sees
+├── Persistence/          SwiftData model, repository protocol, two implementations
+├── Services/             Launching, URL validation, App Store lookup, icon processing
+├── Features/
+│   ├── Holographic/      Backdrop, glass treatment, pedestal, portal effect
+│   ├── Launcher/         Carousel, layout maths, view model, page indicator
+│   └── Settings/         Glass settings sheet and the add/edit form
+├── Demo/                 Five programmatically drawn demo icons
+├── Support/              Accessibility identifiers, preview host, launch stub
+└── Resources/            Asset catalog, app icon
+```
+
+A few decisions worth knowing about:
+
+- **The UI never touches SwiftData.** `LauncherRepository` hands out
+  `LauncherItem` value types. `InMemoryLauncherRepository` implements the same
+  contract, and both are run against the same test suite.
+- **Launching goes through `AppLaunching`.** The production implementation calls
+  `UIApplication.open` and reports the system's result. `canOpenURL` is never
+  used on user-entered schemes — that would require declaring every scheme in
+  advance and amounts to probing what is installed.
+- **Icon import is pure ImageIO.** `Data` in, `Data` out, no UIKit, so it is
+  `Sendable` and runs off the main actor. Everything is centre-cropped to a
+  square and capped at 512px.
+- **One switch governs every continuous animation.** `HoloMotion` combines scene
+  phase, Reduce Motion and the test flag; every `TimelineView` reads it, so the
+  shimmer, scan lines and particles stop when the app is not on screen.
+- **Overlays add light, they do not replace colour.** The glass, scan lines and
+  shimmer composite with `.screen` and `.plusLighter` at low opacity, so an
+  orange tag still reads as orange.
+
+---
+
+## Accessibility
+
+- Reduce Motion swaps the continuous depth curve for a single scale step, stops
+  the shimmer, scan-line drift and particle field, and shortens the launch
+  ceremony.
+- Every tile is a labelled button with a hint that says whether a tap will
+  centre it or open it, plus a matching custom action.
+- Left and right arrow keys move the selection; Return and Space open the
+  centred app.
+
+---
+
+## Deterministic launch arguments
+
+Used by the UI tests; a build installed from the App Store or TestFlight cannot
+receive them, so the shipping app always takes the production path.
+
+| Argument               | Effect                                            |
+| ---------------------- | ------------------------------------------------- |
+| `-uiTesting`           | Silent feedback, non-persisted selection          |
+| `-inMemoryStore`       | SwiftData store held in memory only               |
+| `-seedDemoApps`        | Replace the library with the five demo tiles      |
+| `-seedEmpty`           | Empty library, to exercise the empty state        |
+| `-disableAnimations`   | Stop continuous effects, collapse the ceremony    |
+| `-mockLaunchSuccess`   | `AppLaunching` reports success without switching  |
+| `-mockLaunchFailure`   | `AppLaunching` reports failure                    |
+
+---
+
+## Tests
+
+```bash
+# Unit tests
+xcodebuild test -project IdleryLauncher.xcodeproj -scheme IdleryLauncher \
+  -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' \
+  -only-testing:IdleryLauncherTests
+
+# UI tests
+xcodebuild test -project IdleryLauncher.xcodeproj -scheme IdleryLauncher \
+  -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' \
+  -only-testing:IdleryLauncherUITests
+```
+
+CI (`.github/workflows/ci.yml`) picks whichever iPad simulator the runner has,
+so it does not depend on a particular device name.
+
+---
+
+## Shipping to TestFlight
+
+`.github/workflows/testflight.yml` is manual (**Actions → TestFlight → Run
+workflow**). It runs the test suite, archives with automatic signing via the App
+Store Connect API, exports and uploads. It needs four repository secrets:
+
+| Secret                           | Where it comes from                                  |
+| -------------------------------- | ---------------------------------------------------- |
+| `APPLE_TEAM_ID`                  | App Store Connect → Membership                        |
+| `APP_STORE_CONNECT_KEY_ID`       | Users and Access → Integrations → App Store Connect API |
+| `APP_STORE_CONNECT_ISSUER_ID`    | Same page, above the key list                         |
+| `APP_STORE_CONNECT_PRIVATE_KEY`  | The `.p8` file's contents, pasted whole               |
+
+The `.p8` is written to the runner with mode 600, never printed, and deleted
+afterwards. Nothing is uploaded unless the archive and tests are green.
+
+---
+
+## Privacy
+
+Everything stays on the iPad. No account, no iCloud, no analytics. The only
+network call is optional: pasting an App Store link to borrow an app's name and
+artwork, which hits Apple's public lookup endpoint. Declining it costs nothing —
+type the details in by hand.

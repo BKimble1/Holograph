@@ -1,0 +1,186 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  project-integrity:
+    name: Project integrity (portable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift lexical sanity check
+        run: python3 Scripts/swift_sanity_check.py
+
+      - name: Validate project.pbxproj
+        run: python3 Scripts/validate_pbxproj.py
+
+      - name: Xcode project is up to date with the source tree
+        run: |
+          python3 Scripts/generate_xcodeproj.py
+          if ! git diff --quiet -- IdleryLauncher.xcodeproj; then
+            echo "::error::IdleryLauncher.xcodeproj is stale. Run 'python3 Scripts/generate_xcodeproj.py' and commit the result."
+            git --no-pager diff -- IdleryLauncher.xcodeproj
+            exit 1
+          fi
+
+      - name: Asset catalog and Info.plist are well formed
+        run: |
+          python3 - <<'PY'
+          import json, plistlib, pathlib, sys
+          problems = []
+          for path in pathlib.Path("IdleryLauncher/Resources").rglob("Contents.json"):
+              try:
+                  json.loads(path.read_text())
+              except Exception as error:
+                  problems.append(f"{path}: {error}")
+          try:
+              info = plistlib.loads(pathlib.Path("IdleryLauncher/Info.plist").read_bytes())
+          except Exception as error:
+              problems.append(f"Info.plist: {error}")
+              info = {}
+          icon = pathlib.Path("IdleryLauncher/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
+          if not icon.exists():
+              problems.append("the 1024x1024 app icon is missing")
+          if problems:
+              print("\n".join(problems), file=sys.stderr)
+              sys.exit(1)
+          print("assets OK; bundle id key:", info.get("CFBundleIdentifier"))
+          PY
+
+  build-and-test:
+    name: Build and test on an iPad simulator
+    runs-on: macos-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          chosen=""
+          for candidate in $(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V -r) \
+                           $(ls -d /Applications/Xcode_2*.app 2>/dev/null | sort -V -r) \
+                           /Applications/Xcode.app; do
+            if [ -d "$candidate" ]; then chosen="$candidate"; break; fi
+          done
+          if [ -z "$chosen" ]; then
+            echo "::error::No Xcode installation found on this runner"; exit 1
+          fi
+          echo "Using $chosen"
+          sudo xcode-select -s "$chosen"
+          xcodebuild -version
+          swift --version
+
+      - name: Choose an available iPad simulator
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > /tmp/devices.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json, os, re
+          data = json.load(open("/tmp/devices.json"))
+          candidates = []
+          for runtime, devices in data["devices"].items():
+              if "iOS" not in runtime:
+                  continue
+              version = re.findall(r"iOS-(\d+)-(\d+)", runtime)
+              order = tuple(int(part) for part in version[0]) if version else (0, 0)
+              for device in devices:
+                  if not device.get("isAvailable"):
+                      continue
+                  name = device["name"]
+                  if "iPad" not in name:
+                      continue
+                  # Prefer the largest modern iPad Pro, then any iPad Pro/Air.
+                  rank = 0
+                  if "iPad Pro" in name:
+                      rank = 3
+                  elif "iPad Air" in name:
+                      rank = 2
+                  elif "iPad (" in name or name == "iPad":
+                      rank = 1
+                  candidates.append((rank, order, name, device["udid"]))
+          if not candidates:
+              raise SystemExit("::error::No iPad simulator is available on this runner")
+          candidates.sort(reverse=True)
+          rank, order, name, udid = candidates[0]
+          print(f"SIMULATOR_UDID={udid}")
+          print(f"SIMULATOR_NAME={name}")
+          PY
+          echo "Selected simulator: $(grep SIMULATOR_NAME "$GITHUB_ENV" | tail -1)"
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project IdleryLauncher.xcodeproj \
+            -scheme IdleryLauncher \
+            -configuration Debug \
+            -destination "id=${SIMULATOR_UDID}" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee build.log
+
+      - name: Report compiler warnings
+        if: always()
+        run: |
+          if [ -f build.log ]; then
+            echo "### Compiler warnings" >> "$GITHUB_STEP_SUMMARY"
+            grep -E "warning:" build.log | sort -u | head -50 >> "$GITHUB_STEP_SUMMARY" || echo "None." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project IdleryLauncher.xcodeproj \
+            -scheme IdleryLauncher \
+            -configuration Debug \
+            -destination "id=${SIMULATOR_UDID}" \
+            -derivedDataPath build \
+            -only-testing:IdleryLauncherTests \
+            -resultBundlePath UnitTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee unit-tests.log
+
+      - name: Run UI tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project IdleryLauncher.xcodeproj \
+            -scheme IdleryLauncher \
+            -configuration Debug \
+            -destination "id=${SIMULATOR_UDID}" \
+            -derivedDataPath build \
+            -only-testing:IdleryLauncherUITests \
+            -resultBundlePath UITests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee ui-tests.log
+
+      - name: Upload logs and result bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build.log
+            unit-tests.log
+            ui-tests.log
+            UnitTests.xcresult
+            UITests.xcresult
+          retention-days: 7
+          if-no-files-found: ignore

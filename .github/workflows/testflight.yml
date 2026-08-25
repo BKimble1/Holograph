@@ -1,0 +1,192 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Build number to stamp on the archive (defaults to the run number)"
+        required: false
+        type: string
+      skip_tests:
+        description: "Skip the test gate (not recommended)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Archive and upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the required secrets exist
+        env:
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${APPLE_TEAM_ID:-}" ] || missing+=("APPLE_TEAM_ID")
+          [ -n "${APP_STORE_CONNECT_KEY_ID:-}" ] || missing+=("APP_STORE_CONNECT_KEY_ID")
+          [ -n "${APP_STORE_CONNECT_ISSUER_ID:-}" ] || missing+=("APP_STORE_CONNECT_ISSUER_ID")
+          [ -n "${APP_STORE_CONNECT_PRIVATE_KEY:-}" ] || missing+=("APP_STORE_CONNECT_PRIVATE_KEY")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}."
+            echo "::error::Add them under Settings → Secrets and variables → Actions, then re-run."
+            exit 1
+          fi
+          echo "All four App Store Connect secrets are present."
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          chosen=""
+          for candidate in $(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V -r) \
+                           $(ls -d /Applications/Xcode_2*.app 2>/dev/null | sort -V -r) \
+                           /Applications/Xcode.app; do
+            if [ -d "$candidate" ]; then chosen="$candidate"; break; fi
+          done
+          [ -n "$chosen" ] || { echo "::error::No Xcode installation found"; exit 1; }
+          sudo xcode-select -s "$chosen"
+          xcodebuild -version
+
+      - name: Install the App Store Connect API key
+        env:
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/private_keys
+          # The secret holds the .p8 contents. Nothing is echoed.
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+          chmod 600 ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+          if ! grep -q "BEGIN PRIVATE KEY" ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8; then
+            echo "::error::APP_STORE_CONNECT_PRIVATE_KEY does not look like a .p8 private key."
+            exit 1
+          fi
+          echo "API key installed."
+
+      - name: Test gate on an iPad simulator
+        if: ${{ inputs.skip_tests != true }}
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > /tmp/devices.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json, re
+          data = json.load(open("/tmp/devices.json"))
+          candidates = []
+          for runtime, devices in data["devices"].items():
+              if "iOS" not in runtime:
+                  continue
+              version = re.findall(r"iOS-(\d+)-(\d+)", runtime)
+              order = tuple(int(part) for part in version[0]) if version else (0, 0)
+              for device in devices:
+                  if device.get("isAvailable") and "iPad" in device["name"]:
+                      rank = 3 if "iPad Pro" in device["name"] else 2 if "iPad Air" in device["name"] else 1
+                      candidates.append((rank, order, device["name"], device["udid"]))
+          if not candidates:
+              raise SystemExit("::error::No iPad simulator is available")
+          candidates.sort(reverse=True)
+          print(f"SIMULATOR_UDID={candidates[0][3]}")
+          PY
+          set -o pipefail
+          xcodebuild test \
+            -project IdleryLauncher.xcodeproj \
+            -scheme IdleryLauncher \
+            -configuration Debug \
+            -destination "id=${SIMULATOR_UDID}" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Write export options
+        run: |
+          set -euo pipefail
+          cat > /tmp/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>destination</key>
+            <string>export</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint /tmp/ExportOptions.plist
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          BUILD_NUMBER="${{ inputs.build_number }}"
+          [ -n "$BUILD_NUMBER" ] || BUILD_NUMBER="${{ github.run_number }}"
+          echo "Archiving build $BUILD_NUMBER"
+          set -o pipefail
+          xcodebuild archive \
+            -project IdleryLauncher.xcodeproj \
+            -scheme IdleryLauncher \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath /tmp/IdleryLauncher.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            -authenticationKeyID "${APP_STORE_CONNECT_KEY_ID}" \
+            -authenticationKeyIssuerID "${APP_STORE_CONNECT_ISSUER_ID}" \
+            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Export the IPA
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath /tmp/IdleryLauncher.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath /tmp/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            -authenticationKeyID "${APP_STORE_CONNECT_KEY_ID}" \
+            -authenticationKeyIssuerID "${APP_STORE_CONNECT_ISSUER_ID}"
+          ls -la /tmp/export
+
+      - name: Upload to TestFlight
+        run: |
+          set -euo pipefail
+          IPA="$(ls /tmp/export/*.ipa | head -1)"
+          echo "Uploading $(basename "$IPA")"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "${APP_STORE_CONNECT_KEY_ID}" \
+            --apiIssuer "${APP_STORE_CONNECT_ISSUER_ID}"
+
+      - name: Remove the API key from the runner
+        if: always()
+        run: rm -rf ~/private_keys
+
+      - name: Upload the archive for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: /tmp/export
+          retention-days: 5
+          if-no-files-found: ignore
