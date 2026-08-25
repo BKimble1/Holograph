@@ -30,11 +30,29 @@ enum ModelContainerFactory {
 
     private static func container(inMemory: Bool) -> ModelContainer? {
         do {
-            let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+            let configuration: ModelConfiguration
+            if inMemory {
+                configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            } else {
+                configuration = ModelConfiguration(schema: schema, url: try storeURL())
+            }
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             logger.error("Model container failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
+    }
+
+    /// Naming the store explicitly — and creating its directory first — avoids
+    /// depending on Application Support already existing, which is not
+    /// guaranteed on a freshly installed container.
+    private static func storeURL() throws -> URL {
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        return directory.appending(path: "IdleryLauncher.store")
     }
 }

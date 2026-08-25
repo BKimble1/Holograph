@@ -135,9 +135,6 @@ jobs:
             -configuration Debug \
             -destination "id=${SIMULATOR_UDID}" \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
             | tee build.log
 
       - name: Report compiler warnings
@@ -163,9 +160,6 @@ jobs:
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 60 \
             -maximum-test-execution-time-allowance 180 \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
             | tee unit-tests.log
 
       - name: Run UI tests
@@ -183,9 +177,6 @@ jobs:
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
             -maximum-test-execution-time-allowance 300 \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
             | tee ui-tests.log
 
       - name: Export screenshots from the UI test results

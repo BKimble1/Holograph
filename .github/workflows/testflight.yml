@@ -103,10 +103,7 @@ jobs:
             -scheme IdleryLauncher \
             -configuration Debug \
             -destination "id=${SIMULATOR_UDID}" \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            -derivedDataPath build
 
       - name: Write export options
         run: |

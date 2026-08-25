@@ -58,6 +58,21 @@ struct LaunchEnvironment: Sendable, Equatable {
     }
 
     static var current: LaunchEnvironment {
-        make(from: ProcessInfo.processInfo.arguments)
+        var environment = make(from: ProcessInfo.processInfo.arguments)
+        if isHostingUnitTests {
+            // Unit tests run inside this app. They exercise the repository
+            // directly and must never touch — or create — the real library.
+            environment.store = .inMemory
+            environment.seed = .empty
+            environment.animationsDisabled = true
+        }
+        return environment
+    }
+
+    /// `true` only in the app process that hosts the unit-test bundle. UI tests
+    /// drive the app from a separate runner, so this stays `false` for them.
+    static var isHostingUnitTests: Bool {
+        let variables = ProcessInfo.processInfo.environment
+        return variables["XCTestConfigurationFilePath"] != nil || variables["XCTestBundlePath"] != nil
     }
 }
