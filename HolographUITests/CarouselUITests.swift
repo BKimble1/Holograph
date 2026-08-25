@@ -93,10 +93,10 @@ final class CarouselUITests: LauncherUITestCase {
 
         let alert = app.alerts.element
         XCTAssertTrue(alert.waitForExistence(timeout: 20), "A refused launch must explain itself")
-        XCTAssertTrue(alert.buttons["Edit App"].exists)
-        XCTAssertTrue(alert.buttons["Cancel"].exists)
+        XCTAssertTrue(alert.buttons["Edit App"].firstMatch.exists)
+        XCTAssertTrue(alert.buttons["Cancel"].firstMatch.exists)
 
-        alert.buttons["Cancel"].tap()
+        alert.buttons["Cancel"].firstMatch.tap()
         XCTAssertFalse(app.alerts.element.waitForExistence(timeout: 3))
         XCTAssertEqual(selectedAppName.label, "Tagfield", "Cancelling leaves the launcher untouched")
     }
@@ -109,7 +109,7 @@ final class CarouselUITests: LauncherUITestCase {
 
         let alert = app.alerts.element
         XCTAssertTrue(alert.waitForExistence(timeout: 20))
-        alert.buttons["Edit App"].tap()
+        alert.buttons["Edit App"].firstMatch.tap()
 
         let nameField = app.textFields["editor.name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 20), "Recovery should open the editor for that app")

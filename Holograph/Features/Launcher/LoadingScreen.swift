@@ -69,6 +69,11 @@ struct LoadingScreen: View {
             Text("powered by")
                 .font(.system(size: 12, weight: .regular, design: .rounded))
                 .foregroundStyle(HoloTheme.secondaryText.opacity(0.72))
+                // Carried by the text itself: a `Text` is always an element,
+                // where an element synthesised around a stack is not reliably
+                // one, and the credit is asserted on.
+                .accessibilityLabel("Powered by Idlery")
+                .accessibilityIdentifier(AccessibilityID.poweredByIdlery)
 
             Image("IdleryWordmark")
                 .resizable()
@@ -79,9 +84,6 @@ struct LoadingScreen: View {
         }
         .opacity(hasAppeared ? 1 : 0)
         .animation(motion.prefersReducedMotion ? .easeInOut(duration: 0.3) : .easeOut(duration: 0.5).delay(0.28), value: hasAppeared)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Powered by Idlery")
-        .accessibilityIdentifier(AccessibilityID.poweredByIdlery)
     }
 
     // MARK: - Motion

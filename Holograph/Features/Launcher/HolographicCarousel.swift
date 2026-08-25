@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// The carousel stage's own coordinate space.
+///
+/// File scope rather than a member, because `visualEffect`'s closure runs off
+/// the main actor and could not read a constant belonging to a `@MainActor`
+/// view.
+private let holoCarouselStageSpace = "holograph.carousel.stage"
+
 /// The horizontally scrolling wall of holographic tiles.
 ///
 /// Built on the iOS 17 scrolling APIs — `scrollTargetBehavior(.viewAligned)`
@@ -16,10 +23,6 @@ struct HolographicCarousel: View {
     let onActivate: (LauncherItem) -> Void
 
     @Environment(HoloMotion.self) private var motion
-
-    /// The stage's own coordinate space. Depth is measured against this rather
-    /// than `.scrollView`, whose origin does not track the visible centre.
-    private static let stageSpace = "holograph.carousel.stage"
 
     /// Gap between tile slots. Slots stay a constant width; neighbours shrink
     /// visually, which is what opens up the space seen in the design.
@@ -54,7 +57,7 @@ struct HolographicCarousel: View {
                 }
             }
         }
-        .coordinateSpace(.named(Self.stageSpace))
+        .coordinateSpace(.named(holoCarouselStageSpace))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.carousel)
         .accessibilityLabel("App carousel")
@@ -85,7 +88,7 @@ struct HolographicCarousel: View {
         .frame(width: size, height: size)
         .visualEffect { content, geometry in
             let offset = HolographicCarousel.normalisedOffset(
-                midX: geometry.frame(in: .named(HolographicCarousel.stageSpace)).midX,
+                midX: geometry.frame(in: .named(holoCarouselStageSpace)).midX,
                 containerWidth: containerWidth,
                 slotWidth: slotWidth
             )

@@ -8,7 +8,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         let credit = app.descendants(matching: .any)[AccessibilityIdentifiers.poweredByIdlery].firstMatch
         XCTAssertTrue(
             credit.waitForExistence(timeout: 10),
-            "The loading screen carries the Idlery credit"
+            "The loading screen carries the Idlery credit. On screen:\n\(visibleElementSummary())"
         )
 
         XCTAssertTrue(selectedAppName.waitForExistence(timeout: 20), "The launcher should take over on its own")

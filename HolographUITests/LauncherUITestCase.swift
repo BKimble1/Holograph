@@ -79,12 +79,38 @@ class LauncherUITestCase: XCTestCase {
         app.descendants(matching: .any)["settings.row.\(name)"].firstMatch
     }
 
-    /// A row's "…" menu. SwiftUI does not reliably surface the accessibility
-    /// identifier it is given on a `Menu`, but the label always comes through.
-    func rowMenu(_ name: String) -> XCUIElement {
+    /// A row's "…" menu, resolved by identifier or by accessibility label.
+    ///
+    /// Both are polled rather than one being preferred outright: whether a
+    /// `Menu` surfaces the identifier SwiftUI is given depends on what the rest
+    /// of the row does with accessibility, and the label is the sturdier of the
+    /// two. Returns whichever resolves first, or the label query on timeout so
+    /// the caller's assertion reports something meaningful.
+    func rowMenu(_ name: String, timeout: TimeInterval = 20) -> XCUIElement {
         let byIdentifier = app.descendants(matching: .any)["settings.row.menu.\(name)"].firstMatch
-        if byIdentifier.exists { return byIdentifier }
-        return app.descendants(matching: .any)["Actions for \(name)"].firstMatch
+        let byLabel = app.descendants(matching: .any)["Actions for \(name)"].firstMatch
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if byLabel.exists { return byLabel }
+            if byIdentifier.exists { return byIdentifier }
+            // Doubles as the poll interval; there is nothing to wait on that is
+            // not already covered by the two queries.
+            _ = byLabel.waitForExistence(timeout: 0.5)
+        } while Date() < deadline
+        return byLabel
+    }
+
+    /// A compact dump of what is actually on screen, for failure messages.
+    ///
+    /// A UI test that cannot find an element is only useful if it says what it
+    /// did find — otherwise the next run is another guess.
+    func visibleElementSummary(limit: Int = 80) -> String {
+        let elements = app.descendants(matching: .any).allElementsBoundByIndex
+        let lines = elements.prefix(limit).map { element -> String in
+            "type=\(element.elementType.rawValue) id=\(element.identifier) label=\(element.label)"
+        }
+        let suffix = elements.count > limit ? "\n… and \(elements.count - limit) more" : ""
+        return lines.joined(separator: "\n") + suffix
     }
 
     /// Settings is a form sheet; the lower sections need scrolling into view
@@ -123,7 +149,10 @@ class LauncherUITestCase: XCTestCase {
         line: UInt = #line
     ) {
         let menu = rowMenu(name)
-        XCTAssertTrue(menu.waitForExistence(timeout: 20), "No menu for \(name)", file: file, line: line)
+        guard menu.exists else {
+            XCTFail("No menu for \(name). On screen:\n\(visibleElementSummary())", file: file, line: line)
+            return
+        }
         menu.tap()
 
         let byIdentifier = app.descendants(matching: .any)[identifier].firstMatch

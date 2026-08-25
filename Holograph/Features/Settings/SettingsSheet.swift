@@ -143,12 +143,17 @@ struct SettingsSheet: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            // The row's identity sits here rather than on the enclosing stack.
+            // An accessibility modifier on a plain container propagates down to
+            // every element inside it, which was overwriting the menu's own
+            // identifier with the row's and leaving the menu unaddressable.
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(AccessibilityID.appRow(item.name))
 
             Spacer(minLength: 0)
 
             rowMenu(for: item)
         }
-        .accessibilityIdentifier(AccessibilityID.appRow(item.name))
     }
 
     private func rowMenu(for item: LauncherItem) -> some View {
