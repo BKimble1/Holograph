@@ -71,7 +71,46 @@ def fetch(token: str, path: str) -> tuple[int, dict]:
             return error.code, {}
 
 
-def report(bundle_id: str) -> int:
+def builds(token: str, app_id: str) -> list[dict]:
+    status, body = fetch(token, (
+        f"/v1/builds?filter[app]={app_id}&limit=10&sort=-uploadedDate"
+        "&fields[builds]=version,processingState,uploadedDate,expired,minOsVersion"
+    ))
+    if status != 200:
+        for problem in body.get("errors", []):
+            print(f"  {problem.get('code')} | {problem.get('title')} | {problem.get('detail')}")
+        return []
+    return body.get("data", [])
+
+
+def wait_for(token: str, app_id: str, version: str, timeout: float) -> dict | None:
+    """Poll until `version` appears and stops being PROCESSING.
+
+    A build Apple has just accepted takes a few minutes to show up at all, so
+    sampling once right after upload reports the *previous* build and says
+    nothing useful about this one.
+    """
+    deadline = time.monotonic() + timeout
+    seen = False
+    while True:
+        for entry in builds(token, app_id):
+            attributes = entry.get("attributes", {})
+            if str(attributes.get("version")) != str(version):
+                continue
+            seen = True
+            if attributes.get("processingState") != "PROCESSING":
+                return entry
+        if time.monotonic() >= deadline:
+            print(
+                f"Build {version} is still "
+                + ("processing" if seen else "not listed yet")
+                + f" after {int(timeout)}s. Run the TestFlight status workflow to check again."
+            )
+            return None
+        time.sleep(20)
+
+
+def report(bundle_id: str, awaited: str | None = None, timeout: float = 600) -> int:
     token = make_token(
         os.environ["ASC_KEY_ID"], os.environ["ASC_ISSUER_ID"], os.environ["ASC_KEY_PATH"]
     )
@@ -89,22 +128,16 @@ def report(bundle_id: str) -> int:
     app = apps[0]
     print(f"App: {app['attributes'].get('name')} ({bundle_id})")
 
-    status, body = fetch(token, (
-        f"/v1/builds?filter[app]={app['id']}&limit=10&sort=-uploadedDate"
-        "&fields[builds]=version,processingState,uploadedDate,expired,minOsVersion"
-    ))
-    if status != 200:
-        for problem in body.get("errors", []):
-            print(f"  {problem.get('code')} | {problem.get('title')} | {problem.get('detail')}")
-        return 1
+    if awaited is not None:
+        wait_for(token, app["id"], awaited, timeout)
 
-    builds = body.get("data", [])
-    if not builds:
+    listed = builds(token, app["id"])
+    if not listed:
         print("No builds yet. A freshly accepted upload takes a few minutes to appear.")
         return 0
 
     print(f"{'build':>8}  {'state':<12} {'min iOS':<9} uploaded")
-    for entry in builds:
+    for entry in listed:
         attributes = entry.get("attributes", {})
         print("{:>8}  {:<12} {:<9} {}{}".format(
             attributes.get("version", "?"),
@@ -118,4 +151,6 @@ def report(bundle_id: str) -> int:
 
 if __name__ == "__main__":
     bundle = sys.argv[1] if len(sys.argv) > 1 else "com.idlery.holograph"
-    raise SystemExit(report(bundle))
+    # Optional second argument: a build number to wait for before reporting.
+    awaited_build = sys.argv[2] if len(sys.argv) > 2 else None
+    raise SystemExit(report(bundle, awaited=awaited_build or None))

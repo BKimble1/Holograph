@@ -341,10 +341,12 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
-          # A freshly accepted build takes a little while to appear at all.
-          sleep 60
+          BUILD_NUMBER="${{ inputs.build_number }}"
+          [ -n "$BUILD_NUMBER" ] || BUILD_NUMBER="${{ github.run_number }}"
+          # Waits for this run's own build rather than sampling once, which
+          # reports the previous one and says nothing about this upload.
           ASC_KEY_PATH=~/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            python3 Scripts/asc_build_status.py com.idlery.holograph \
+            python3 Scripts/asc_build_status.py com.idlery.holograph "$BUILD_NUMBER" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Explain a signing failure
