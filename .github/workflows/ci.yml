@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   project-integrity:
     name: Project integrity (portable)
@@ -163,19 +166,26 @@ jobs:
             echo "::error::simctl install failed"; exit 1;
           }
 
+          echo "--- confirming the executable is not a preview stub ---"
+          file "$APP/Holograph"
+          ls "$APP" | grep -i dylib && echo "::warning::the bundle carries dylibs" || echo "no dylibs in the bundle"
+
           echo "--- launching, streaming the app's own output ---"
-          # A plain launch shows a crash directly, instead of it being reported
-          # only as "crashed before establishing connection" by the test runner.
-          timeout 45 xcrun simctl launch --console-pty --terminate-running-process \
+          # macOS has no coreutils `timeout`; run the stream in the background
+          # and reap it. A plain launch shows a crash directly, instead of it
+          # being reported only as "crashed before establishing connection".
+          xcrun simctl launch --console-pty --terminate-running-process \
             "${SIMULATOR_UDID}" com.idlery.holograph \
-            -seedDemoApps -inMemoryStore -disableAnimations
-          echo "launch stream ended with $?"
+            -seedDemoApps -inMemoryStore &
+          stream=$!
+          sleep 25
+          kill "$stream" 2>/dev/null
 
           echo "--- did it stay up? ---"
-          if xcrun simctl spawn "${SIMULATOR_UDID}" launchctl list 2>/dev/null | grep -q holograph; then
+          if xcrun simctl spawn "${SIMULATOR_UDID}" launchctl list 2>/dev/null | grep -qi holograph; then
             echo "app is running"
           else
-            echo "app is NOT running"
+            echo "::warning::app is NOT running 25s after launch"
           fi
 
           echo "--- crash reports in the last 15 minutes ---"
@@ -272,29 +282,75 @@ jobs:
           # xcresulttool writes a manifest plus opaque filenames; give the images
           # their attachment names so they are readable in the artifact.
           python3 - <<'PY'
-          import json, pathlib, shutil
+          import json, pathlib, re, shutil
           root = pathlib.Path("screenshots")
+          keep = root / "named"
+          keep.mkdir(exist_ok=True)
           manifest = root / "manifest.json"
           if not manifest.exists():
-              print("no manifest.json; leaving exported files as they are")
+              print("no manifest.json; nothing to rename")
               raise SystemExit(0)
-          entries = json.loads(manifest.read_text())
+          # Only this project's own captures, which are all numbered "NN-name".
+          wanted = re.compile(r"^\d{2}-[a-z0-9-]+$")
           count = 0
-          for test in entries:
+          for test in json.loads(manifest.read_text()):
               for attachment in test.get("attachments", []):
                   exported = attachment.get("exportedFileName")
-                  suggested = attachment.get("suggestedHumanReadableName") or exported
-                  if not exported:
+                  suggested = attachment.get("suggestedHumanReadableName") or exported or ""
+                  stem = pathlib.Path(suggested).stem
+                  if not exported or not wanted.match(stem):
                       continue
                   source = root / exported
-                  if not source.exists():
-                      continue
-                  name = pathlib.Path(suggested).stem
-                  shutil.copy(source, root / f"{name}.png")
-                  count += 1
-          print(f"named {count} attachments")
+                  if source.exists():
+                      shutil.copy(source, keep / f"{stem}.png")
+                      count += 1
+          print(f"kept {count} project screenshots")
+          # XCTest's own recordings have quotes in their names, which artifact
+          # upload rejects outright — drop everything except what we kept.
+          for path in root.iterdir():
+              if path != keep:
+                  shutil.rmtree(path) if path.is_dir() else path.unlink()
+          for path in keep.iterdir():
+              shutil.move(str(path), root / path.name)
+          keep.rmdir()
           PY
           ls -la screenshots || true
+
+      - name: Publish screenshots to the ci-screenshots branch
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          shots=(screenshots/*.png)
+          if [ ${#shots[@]} -eq 0 ]; then
+            echo "no screenshots to publish"
+            exit 0
+          fi
+          # Artifact downloads are not reachable from every environment, so the
+          # images also land on a branch anyone can simply fetch.
+          work="$(mktemp -d)"
+          git -C "$work" init -q
+          git -C "$work" config user.name "github-actions[bot]"
+          git -C "$work" config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p "$work/screenshots"
+          cp screenshots/*.png "$work/screenshots/"
+          {
+            echo "# Holograph — CI screenshots"
+            echo
+            echo "Captured from commit ${GITHUB_SHA} on ${SIMULATOR_NAME}."
+            echo
+            for shot in "$work"/screenshots/*.png; do
+              echo "- $(basename "$shot")"
+            done
+          } > "$work/README.md"
+          git -C "$work" add -A
+          git -C "$work" commit -q -m "CI screenshots from ${GITHUB_SHA}"
+          git -C "$work" push -q --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:refs/heads/ci-screenshots
+          echo "published to ci-screenshots"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload screenshots
         if: always()

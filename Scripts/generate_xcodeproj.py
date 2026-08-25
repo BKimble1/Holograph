@@ -501,6 +501,11 @@ def build_configurations(target_uids: dict[str, str]) -> dict[str, dict[str, dic
         "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
+        # Previews stay on, but the app must be one ordinary binary: Xcode
+        # otherwise ships a stub executable plus <Product>.debug.dylib, and a
+        # unit-test bundle that binds against TEST_HOST then cannot resolve the
+        # app's symbols. That fails as an opaque trap before XCTest connects.
+        "ENABLE_DEBUG_DYLIB": "NO",
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "NO",
         "INFOPLIST_FILE": "Holograph/Info.plist",
