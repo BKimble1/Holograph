@@ -22,8 +22,9 @@ class LauncherUITestCase: XCTestCase {
         /// The default for behavioural tests: continuous effects off and the
         /// loading screen shortened, so the suite is not paced by animation.
         case shortened
-        /// Full-length motion, for photographing the loading screen.
-        case full
+        /// Full-length motion, with the loading screen held open long enough to
+        /// be asserted on and photographed.
+        case holdIntro
     }
 
     var app: XCUIApplication!
@@ -42,8 +43,11 @@ class LauncherUITestCase: XCTestCase {
             seed == .demoApps ? "-seedDemoApps" : "-seedEmpty",
             launcher == .succeeds ? "-mockLaunchSuccess" : "-mockLaunchFailure"
         ]
-        if animations == .shortened {
+        switch animations {
+        case .shortened:
             arguments.append("-disableAnimations")
+        case .holdIntro:
+            arguments.append("-holdLoadingScreen")
         }
         application.launchArguments = arguments
         application.launch()
@@ -76,7 +80,19 @@ class LauncherUITestCase: XCTestCase {
     }
 
     func rowMenu(_ name: String) -> XCUIElement {
-        app.buttons["settings.row.menu.\(name)"].firstMatch
+        app.descendants(matching: .any)["settings.row.menu.\(name)"].firstMatch
+    }
+
+    /// Settings is a form sheet; the lower sections need scrolling into view
+    /// before they can be tapped.
+    @discardableResult
+    func revealInSettings(_ identifier: String, attempts: Int = 6) -> XCUIElement {
+        let element = app.descendants(matching: .any)[identifier].firstMatch
+        for _ in 0..<attempts {
+            if element.exists, element.isHittable { return element }
+            app.swipeUp(velocity: .slow)
+        }
+        return element
     }
 
     func openSettings(file: StaticString = #filePath, line: UInt = #line) {

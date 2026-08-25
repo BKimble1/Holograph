@@ -278,7 +278,7 @@ jobs:
               print("no manifest.json; nothing to rename")
               raise SystemExit(0)
           # Only this project's own captures, which are all numbered "NN-name".
-          wanted = re.compile(r"\d{2}-[a-z0-9-]+")
+          wanted = re.compile(r"^(\d{2}-[a-z][a-z-]*[a-z])_")
           count = 0
           entries = json.loads(manifest.read_text())
           print("manifest keys:", sorted({k for e in entries for k in e}))
@@ -293,19 +293,13 @@ jobs:
                       continue
                   # xcresulttool has used more than one key for the name over
                   # the years; try each, then the exported filename itself.
-                  for candidate in (
-                      attachment.get("suggestedHumanReadableName") or "",
-                      attachment.get("name") or "",
-                      exported,
-                  ):
-                      match = wanted.search(candidate)
-                      if match:
-                          break
+                  suggested = attachment.get("suggestedHumanReadableName") or ""
+                  match = wanted.match(suggested)
                   if not match:
                       continue
                   source = root / exported
                   if source.exists():
-                      shutil.copy(source, keep / f"{match.group(0)}.png")
+                      shutil.copy(source, keep / f"{match.group(1)}.png")
                       count += 1
           print(f"kept {count} project screenshots")
           # XCTest's own recordings have quotes in their names, which artifact

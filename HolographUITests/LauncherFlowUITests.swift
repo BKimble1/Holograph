@@ -2,7 +2,7 @@ import XCTest
 
 final class LauncherFlowUITests: LauncherUITestCase {
     func testTheAppOpensOnTheLoadingScreenAndThenHandsOver() {
-        launchApp(seed: .demoApps, animations: .full)
+        launchApp(seed: .demoApps, animations: .holdIntro)
 
         XCTAssertTrue(loadingScreen.waitForExistence(timeout: 20), "The app should open on the loading screen")
         XCTAssertTrue(
@@ -134,7 +134,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         launchApp(seed: .demoApps)
         openSettings()
 
-        app.buttons["settings.removeAllApps"].tap()
+        revealInSettings("settings.removeAllApps").tap()
         let confirm = app.alerts.buttons["Remove All"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10))
         confirm.tap()
@@ -147,7 +147,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         launchApp(seed: .empty)
         openSettings()
 
-        app.buttons["settings.restoreDemoApps"].tap()
+        revealInSettings("settings.restoreDemoApps").tap()
 
         XCTAssertTrue(appRow("Tagfield").waitForExistence(timeout: 20))
         closeSettings()

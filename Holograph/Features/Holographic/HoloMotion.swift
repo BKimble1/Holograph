@@ -15,9 +15,12 @@ final class HoloMotion {
     var prefersReducedMotion = false
     /// Set by the `-disableAnimations` launch argument so UI tests are stable.
     var isDisabledForTesting = false
+    /// Set by `-holdLoadingScreen` so a test can assert on the intro.
+    var holdsLoadingScreen = false
 
-    init(isDisabledForTesting: Bool = false) {
+    init(isDisabledForTesting: Bool = false, holdsLoadingScreen: Bool = false) {
         self.isDisabledForTesting = isDisabledForTesting
+        self.holdsLoadingScreen = holdsLoadingScreen
     }
 
     /// Whether shimmer, scan-line drift and particles should keep ticking.
@@ -42,6 +45,7 @@ final class HoloMotion {
     /// How long the loading screen holds before the launcher takes over. Short
     /// under test so the suite is not paced by an animation.
     var introDuration: Duration {
+        if holdsLoadingScreen { return .seconds(8) }
         if isDisabledForTesting { return .milliseconds(600) }
         if prefersReducedMotion { return .milliseconds(900) }
         return .milliseconds(1700)

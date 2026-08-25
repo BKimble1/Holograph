@@ -48,11 +48,15 @@ struct IconProcessor: Sendable {
               CGImageSourceGetCount(source) > 0
         else { throw IconProcessingError.unreadableImage }
 
+        // ImageIO scales by the longest edge, so ask for a thumbnail large
+        // enough that the square we crop out of it still meets the ceiling.
+        // Scaling first would shrink a 4:3 photo's square to three quarters of
+        // the limit for no reason.
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+            kCGImageSourceThumbnailMaxPixelSize: thumbnailEdge(for: source)
         ]
         guard let scaled = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             throw IconProcessingError.unreadableImage
@@ -61,6 +65,23 @@ struct IconProcessor: Sendable {
         let squared = try centreCropToSquare(scaled)
         let encoded = try encodePNG(squared)
         return ProcessedIcon(data: encoded, pixelSize: squared.width)
+    }
+
+    /// The longest edge to request so that the centre square comes out at the
+    /// ceiling. Falls back to the ceiling itself when the source will not say
+    /// how big it is.
+    private func thumbnailEdge(for source: CGImageSource) -> Int {
+        guard
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let width = properties[kCGImagePropertyPixelWidth] as? Int,
+            let height = properties[kCGImagePropertyPixelHeight] as? Int,
+            width > 0, height > 0
+        else { return maxPixelSize }
+
+        let shortest = min(width, height)
+        let longest = max(width, height)
+        guard shortest > maxPixelSize else { return longest }
+        return Int((Double(longest) / Double(shortest) * Double(maxPixelSize)).rounded(.up))
     }
 
     private func centreCropToSquare(_ image: CGImage) throws -> CGImage {

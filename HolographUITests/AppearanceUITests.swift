@@ -37,7 +37,7 @@ final class AppearanceUITests: LauncherUITestCase {
     }
 
     func testCaptureLoadingScreen() {
-        launchApp(seed: .demoApps, animations: .full)
+        launchApp(seed: .demoApps, animations: .holdIntro)
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(loadingScreen.waitForExistence(timeout: 20))
         settle(0.5)

@@ -91,7 +91,10 @@ struct AppComposition {
             selectionStore: selectionStore
         )
 
-        let motion = HoloMotion(isDisabledForTesting: environment.animationsDisabled)
+        let motion = HoloMotion(
+            isDisabledForTesting: environment.animationsDisabled,
+            holdsLoadingScreen: environment.holdsLoadingScreen
+        )
 
         let model = LauncherViewModel(
             repository: repository,

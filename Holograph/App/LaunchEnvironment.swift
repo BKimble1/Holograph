@@ -31,6 +31,10 @@ struct LaunchEnvironment: Sendable, Equatable {
     var launcher: LauncherKind = .system
     var animationsDisabled = false
     var isUITesting = false
+    /// Holds the loading screen open long enough for a test to photograph it
+    /// and assert on it. `XCUIApplication.launch()` waits for the app to settle,
+    /// which can already outlast the normal intro.
+    var holdsLoadingScreen = false
 
     enum Argument {
         static let uiTesting = "-uiTesting"
@@ -40,6 +44,7 @@ struct LaunchEnvironment: Sendable, Equatable {
         static let disableAnimations = "-disableAnimations"
         static let mockLaunchSuccess = "-mockLaunchSuccess"
         static let mockLaunchFailure = "-mockLaunchFailure"
+        static let holdLoadingScreen = "-holdLoadingScreen"
     }
 
     static func make(from arguments: [String]) -> LaunchEnvironment {
@@ -53,6 +58,7 @@ struct LaunchEnvironment: Sendable, Equatable {
         if flags.contains(Argument.disableAnimations) { environment.animationsDisabled = true }
         if flags.contains(Argument.mockLaunchSuccess) { environment.launcher = .stubbedSuccess }
         if flags.contains(Argument.mockLaunchFailure) { environment.launcher = .stubbedFailure }
+        if flags.contains(Argument.holdLoadingScreen) { environment.holdsLoadingScreen = true }
 
         return environment
     }

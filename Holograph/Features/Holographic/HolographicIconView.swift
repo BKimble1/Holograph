@@ -34,7 +34,7 @@ struct HolographicIconView: View {
             // 1. Bloom behind the tile.
             shape
                 .fill(HoloTheme.cyan)
-                .frame(width: size * 1.02, height: size * 1.02)
+                .frame(width: size, height: size)
                 .blur(radius: size * 0.16)
                 .opacity((0.10 + 0.34 * intensity) * boost)
 
@@ -53,6 +53,7 @@ struct HolographicIconView: View {
                         endPoint: .bottom
                     )
                 )
+                .frame(width: size, height: size)
                 .opacity(0.62 + 0.18 * intensity)
 
             // 3. The app's own artwork, untouched.
@@ -72,18 +73,20 @@ struct HolographicIconView: View {
                         endPoint: .bottom
                     )
                 )
+                .frame(width: size, height: size)
                 .opacity(glassOpacity)
                 .blendMode(.screen)
 
             // 5. Scan lines drifting slowly down the glass.
             ScanLineOverlay(spacing: max(3, size * 0.026), phase: scanPhase(time: time))
-                .mask { shape }
+                .frame(width: size, height: size)
+                .mask { shape.frame(width: size, height: size) }
                 .opacity(0.16 * intensity)
                 .blendMode(.plusLighter)
 
             // 6. A single soft shimmer sweeping diagonally.
             ShimmerBand(progress: shimmerProgress(time: time), size: size)
-                .mask { shape }
+                .mask { shape.frame(width: size, height: size) }
                 .opacity((0.5 + 0.5 * launchProgress) * intensity)
                 .blendMode(.plusLighter)
 
@@ -101,13 +104,16 @@ struct HolographicIconView: View {
                     ),
                     lineWidth: max(1, size * 0.0075)
                 )
+                .frame(width: size, height: size)
                 .opacity(0.35 + 0.6 * intensity)
 
             // 8. An inner hairline that sells the thickness of the glass.
             shape
                 .inset(by: size * 0.028)
                 .strokeBorder(HoloTheme.cyanBright.opacity(0.22 * intensity), lineWidth: max(0.5, size * 0.003))
+                .frame(width: size, height: size)
         }
+        .frame(width: size, height: size)
         .compositingGroup()
         .shadow(color: HoloTheme.cyan.opacity(0.55 * intensity * boost), radius: size * 0.16)
         .shadow(color: HoloTheme.cyanBright.opacity(0.22 * intensity), radius: size * 0.04)
@@ -168,6 +174,10 @@ struct ShimmerBand: View {
         .frame(width: size * 2.2, height: size * 0.34)
         .rotationEffect(.degrees(-24))
         .offset(y: (CGFloat(progress) * 2.4 - 1.2) * size)
+        // The band travels beyond the tile; clamping its layout size keeps it
+        // from stretching the stack it is composited into.
+        .frame(width: size, height: size)
+        .clipped()
         .allowsHitTesting(false)
     }
 }

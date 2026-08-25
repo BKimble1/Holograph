@@ -26,18 +26,29 @@ struct HolographicCarousel: View {
             let containerWidth = proxy.size.width
             let sideInset = max(0, (containerWidth - tileSize) / 2)
 
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: spacing) {
-                    ForEach(items) { item in
-                        tile(for: item, containerWidth: containerWidth)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: spacing) {
+                        ForEach(items) { item in
+                            tile(for: item, containerWidth: containerWidth)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $selectedID, anchor: .center)
+                .scrollIndicators(.hidden)
+                .contentMargins(.horizontal, sideInset, for: .scrollContent)
+                // `scrollPosition` alone does not always land on the selected
+                // tile the first time the row is laid out — the lazy stack has
+                // not built it yet. Re-assert it once the row exists, and again
+                // whenever the contents change underneath us.
+                .task(id: items.map(\.id)) {
+                    guard let selectedID else { return }
+                    await Task.yield()
+                    proxy.scrollTo(selectedID, anchor: .center)
+                }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $selectedID, anchor: .center)
-            .scrollIndicators(.hidden)
-            .contentMargins(.horizontal, sideInset, for: .scrollContent)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.carousel)

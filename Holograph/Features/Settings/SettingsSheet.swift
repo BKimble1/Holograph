@@ -24,7 +24,7 @@ struct SettingsSheet: View {
             }
             .scrollContentBackground(.hidden)
             .listStyle(.insetGrouped)
-            .navigationTitle("Launcher Settings")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
