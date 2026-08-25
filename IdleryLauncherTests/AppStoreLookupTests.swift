@@ -63,7 +63,8 @@ final class AppStoreLookupTests: XCTestCase {
         let metadata = try await service.metadata(forAppID: 1_234_567_890, countryCode: "GB")
 
         XCTAssertEqual(metadata.name, "Field Notes")
-        let url = try XCTUnwrap(await requested.urls.first)
+        let recorded = await requested.urls
+        let url = try XCTUnwrap(recorded.first)
         XCTAssertEqual(url.host(), "itunes.apple.com")
         XCTAssertEqual(url.path(), "/lookup")
         let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)

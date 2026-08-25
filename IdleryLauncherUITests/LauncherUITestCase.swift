@@ -2,6 +2,11 @@ import XCTest
 
 /// Shared plumbing: every test launches the app with an explicit, deterministic
 /// configuration so nothing depends on what a previous run left behind.
+///
+/// Main-actor isolated because every `XCUIElement` API is. Setup happens inside
+/// `launchApp` rather than a `setUp` override, which keeps the isolation of this
+/// class independent of `XCTestCase`'s.
+@MainActor
 class LauncherUITestCase: XCTestCase {
     enum Seed {
         case demoApps
@@ -15,18 +20,9 @@ class LauncherUITestCase: XCTestCase {
 
     var app: XCUIApplication!
 
-    override func setUp() {
-        super.setUp()
-        continueAfterFailure = false
-    }
-
-    override func tearDown() {
-        app = nil
-        super.tearDown()
-    }
-
     @discardableResult
     func launchApp(seed: Seed, launcher: LaunchStub = .succeeds) -> XCUIApplication {
+        continueAfterFailure = false
         let application = XCUIApplication()
         application.launchArguments = [
             "-uiTesting",
