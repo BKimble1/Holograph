@@ -166,6 +166,39 @@ Store Connect API, exports and uploads. It needs four repository secrets:
 The `.p8` is written to the runner with mode 600, never printed, and deleted
 afterwards. Nothing is uploaded unless the archive and tests are green.
 
+### The signing certificate
+
+Those four secrets authenticate to Apple. They are not, on their own, enough to
+*sign*: signing needs a distribution certificate's **private key**, and Apple
+never releases one after it is created. A hosted runner starts with an empty
+keychain, so it has to be handed a key or be allowed to create its own. Take
+either route.
+
+**A key that can create its own.** Generate the App Store Connect API key under
+the **App Manager** role (Users and Access → Integrations). Xcode's cloud
+signing then creates and manages both the certificate and the App Store
+provisioning profile, and nothing else is needed. A key's role is fixed when it
+is generated, so a Developer-role key cannot be promoted — generate a new one
+and update `APP_STORE_CONNECT_KEY_ID` and `APP_STORE_CONNECT_PRIVATE_KEY`.
+A key without this role fails at export with `Cloud signing permission error`.
+
+**Or supply the certificate.** In Keychain Access on a Mac that already holds an
+Apple Distribution certificate, export it as `.p12`, then add two more secrets:
+
+| Secret                              | Value                                  |
+| ----------------------------------- | -------------------------------------- |
+| `APPLE_DISTRIBUTION_CERT_P12`       | `base64 -i cert.p12` — the whole string |
+| `APPLE_DISTRIBUTION_CERT_PASSWORD`  | The password set during export          |
+
+The workflow imports it into a throwaway keychain and deletes both the file and
+the keychain when it finishes. This route also needs an **App Store provisioning
+profile for `com.idlery.holograph`** to exist in the developer portal — a
+read-only key can download a profile but cannot create one.
+
+The workflow's first step reports what the key can actually see — certificates,
+profiles, devices and bundle IDs, by count and by Apple's own error codes — so a
+signing problem says which of these is missing instead of failing opaquely.
+
 ---
 
 ## Privacy
