@@ -222,7 +222,11 @@ enum HoloVoice {
         let pool = british.isEmpty ? candidates.filter { $0.language.hasPrefix("en") } : british
         guard !pool.isEmpty else { return nil }
 
-        return pool.max { first, second in rank(first) < rank(second) }
+        // Arrays are not Comparable; the ranking is lexicographic by intent, so
+        // say so rather than collapsing it into one number and losing the order.
+        return pool.max { first, second in
+            rank(first).lexicographicallyPrecedes(rank(second))
+        }
     }
 
     /// Higher sorts better. Ordered by what actually matters to the ear: the
