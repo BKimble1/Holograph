@@ -74,6 +74,81 @@ jobs:
           fi
           echo "API key installed."
 
+      # What can this key actually do? "Cloud signing permission error" from
+      # exportArchive is Apple refusing to create signing assets, and the only
+      # way to tell a role problem from a missing asset is to ask. Prints
+      # counts and error codes only — never any part of the key.
+      - name: Check what the App Store Connect key is allowed to do
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, collections, json, os, subprocess, time, urllib.error, urllib.request
+
+          key_id = os.environ["APP_STORE_CONNECT_KEY_ID"]
+          issuer = os.environ["APP_STORE_CONNECT_ISSUER_ID"]
+          key_path = os.path.expanduser("~/private_keys/AuthKey_%s.p8" % key_id)
+
+          def b64(raw: bytes) -> str:
+              return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+          now = int(time.time())
+          header = b64(json.dumps({"alg": "ES256", "kid": key_id, "typ": "JWT"}).encode())
+          payload = b64(json.dumps({
+              "iss": issuer, "iat": now, "exp": now + 600, "aud": "appstoreconnect-v1",
+          }).encode())
+          signing_input = ("%s.%s" % (header, payload)).encode()
+
+          der = subprocess.run(
+              ["openssl", "dgst", "-sha256", "-sign", key_path],
+              input=signing_input, capture_output=True, check=True,
+          ).stdout
+
+          # ES256 wants the raw r||s pair; openssl emits DER SEQUENCE{INTEGER,INTEGER}.
+          def take_integer(buf, at):
+              assert buf[at] == 0x02, "expected an INTEGER"
+              size = buf[at + 1]
+              value = buf[at + 2: at + 2 + size]
+              return value.lstrip(b"\x00").rjust(32, b"\x00"), at + 2 + size
+
+          assert der[0] == 0x30, "expected a SEQUENCE"
+          start = 2 if der[1] < 0x80 else 2 + (der[1] & 0x7F)
+          r, after_r = take_integer(der, start)
+          s, _ = take_integer(der, after_r)
+          token = "%s.%s.%s" % (header, payload, b64(r + s))
+
+          def fetch(path):
+              request = urllib.request.Request(
+                  "https://api.appstoreconnect.apple.com" + path,
+                  headers={"Authorization": "Bearer " + token},
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      return response.status, json.load(response)
+              except urllib.error.HTTPError as error:
+                  raw = error.read() or b"{}"
+                  try:
+                      return error.code, json.loads(raw)
+                  except ValueError:
+                      return error.code, {}
+
+          for label, path, field in (
+              ("certificates", "/v1/certificates?limit=200", "certificateType"),
+              ("profiles", "/v1/profiles?limit=200", "profileType"),
+              ("devices", "/v1/devices?limit=200", "deviceClass"),
+              ("bundle IDs", "/v1/bundleIds?limit=200", "identifier"),
+          ):
+              status, body = fetch(path)
+              print("--- %s: HTTP %s" % (label, status))
+              if status != 200:
+                  for problem in body.get("errors", []):
+                      print("      %s | %s | %s" % (
+                          problem.get("code"), problem.get("title"), problem.get("detail")))
+                  continue
+              counts = collections.Counter(
+                  entry.get("attributes", {}).get(field) for entry in body.get("data", []))
+              print("      %s" % (dict(counts) or "none"))
+          PY
+
       - name: Test gate on an iPad simulator
         if: ${{ inputs.skip_tests != true }}
         run: |
