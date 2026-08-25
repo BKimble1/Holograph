@@ -1,3 +1,4 @@
+import SwiftData
 import XCTest
 @testable import IdleryLauncher
 
@@ -5,16 +6,23 @@ import XCTest
 /// and tests can trust the in-memory one to behave like the real store.
 @MainActor
 final class LauncherRepositoryTests: XCTestCase {
-    private func makeRepositories() -> [(String, LauncherRepository)] {
-        let container = ModelContainerFactory.make(inMemory: true).container
+    private func makeRepositories() throws -> [(String, LauncherRepository)] {
+        let container = try makeContainer()
         return [
             ("in-memory", InMemoryLauncherRepository()),
             ("SwiftData", SwiftDataLauncherRepository(context: container.mainContext))
         ]
     }
 
+    private func makeContainer() throws -> ModelContainer {
+        guard case .ready(let container) = ModelContainerFactory.make(inMemory: true) else {
+            throw XCTSkip("An in-memory model container should always be available")
+        }
+        return container
+    }
+
     func testAddAssignsIncreasingSortOrder() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             try repository.add(TestFixtures.draft(name: "One"))
             try repository.add(TestFixtures.draft(name: "Two"))
             try repository.add(TestFixtures.draft(name: "Three"))
@@ -26,7 +34,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testUpdateReplacesEveryEditableField() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             let added = try repository.add(TestFixtures.draft(name: "Before"))
             let iconData = TestFixtures.pngData(width: 40, height: 40)
 
@@ -50,7 +58,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testUpdatingAMissingIdentifierThrows() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             XCTAssertThrowsError(
                 try repository.update(id: UUID(), with: TestFixtures.draft(name: "Ghost")),
                 label
@@ -61,7 +69,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testDeleteRemovesAndRenumbers() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             try repository.add(TestFixtures.draft(name: "A"))
             let b = try repository.add(TestFixtures.draft(name: "B"))
             try repository.add(TestFixtures.draft(name: "C"))
@@ -75,7 +83,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testMoveReordersAndPersistsNewPositions() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             for name in ["A", "B", "C", "D"] {
                 try repository.add(TestFixtures.draft(name: name))
             }
@@ -90,7 +98,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testMoveDownUsesSwiftUIOffsetSemantics() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             for name in ["A", "B", "C"] {
                 try repository.add(TestFixtures.draft(name: name))
             }
@@ -103,7 +111,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testRemoveAllEmptiesTheStore() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             try repository.add(TestFixtures.draft(name: "A"))
             try repository.add(TestFixtures.draft(name: "B"))
 
@@ -114,7 +122,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testReplaceAllSwapsTheWholeLibraryInOrder() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             try repository.add(TestFixtures.draft(name: "Old"))
 
             try repository.replaceAll(with: [
@@ -129,7 +137,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testIconDataSurvivesAReadBack() throws {
-        for (label, repository) in makeRepositories() {
+        for (label, repository) in try makeRepositories() {
             let iconData = TestFixtures.pngData(width: 64, height: 64)
             try repository.add(TestFixtures.draft(name: "Icon", iconData: iconData))
 
@@ -139,8 +147,7 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testUnreadableLaunchURLIsSkippedRatherThanCrashing() throws {
-        let container = ModelContainerFactory.make(inMemory: true).container
-        let context = container.mainContext
+        let context = try makeContainer().mainContext
         context.insert(
             StoredLauncherApp(name: "Broken", launchURLString: "", sortOrder: 0)
         )
