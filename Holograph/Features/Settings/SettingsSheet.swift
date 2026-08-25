@@ -11,6 +11,9 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var editorTarget: EditorTarget?
+    @AppStorage(SoundPreferences.effectsKey) private var soundEffectsEnabled = true
+    @AppStorage(SoundPreferences.spokenLaunchKey) private var spokenLaunchEnabled = true
+
     @State private var pendingDelete: LauncherItem?
     @State private var isConfirmingRemoveAll = false
     @State private var testLaunchResult: TestLaunchResult?
@@ -19,6 +22,7 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 appsSection
+                soundSection
                 librarySection
                 aboutSection
             }
@@ -206,6 +210,26 @@ struct SettingsSheet: View {
         }
         .accessibilityIdentifier(AccessibilityID.appRowMenu(item.name))
         .accessibilityLabel("Actions for \(item.name)")
+    }
+
+    /// Read straight from defaults by the sound service at the point of use, so
+    /// flipping either of these takes effect on the very next tick.
+    private var soundSection: some View {
+        Section {
+            Toggle(isOn: $soundEffectsEnabled) {
+                Label("Sound Effects", systemImage: "waveform")
+            }
+            .accessibilityIdentifier(AccessibilityID.soundEffects)
+
+            Toggle(isOn: $spokenLaunchEnabled) {
+                Label("Say the App Name", systemImage: "speaker.wave.2")
+            }
+            .accessibilityIdentifier(AccessibilityID.spokenLaunch)
+        } header: {
+            Text("Sound")
+        } footer: {
+            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both follow the silent switch and never interrupt what you are already playing.")
+        }
     }
 
     private var librarySection: some View {

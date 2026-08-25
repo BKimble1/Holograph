@@ -44,6 +44,7 @@ final class LauncherViewModel {
     private let repository: LauncherRepository
     private let coordinator: LaunchCoordinator
     private let feedback: FeedbackProviding
+    private let sound: SoundPlaying
     private let selectionStore: SelectionStoring
     private let motion: HoloMotion
     private let logger = Logger(subsystem: "com.idlery.holograph", category: "launcher")
@@ -52,12 +53,14 @@ final class LauncherViewModel {
         repository: LauncherRepository,
         launcher: AppLaunching,
         feedback: FeedbackProviding,
+        sound: SoundPlaying,
         selectionStore: SelectionStoring,
         motion: HoloMotion
     ) {
         self.repository = repository
         self.coordinator = LaunchCoordinator(launcher: launcher)
         self.feedback = feedback
+        self.sound = sound
         self.selectionStore = selectionStore
         self.motion = motion
     }
@@ -144,6 +147,7 @@ final class LauncherViewModel {
         selectionStore.saveSelection(id)
         if wasSelected, id != nil {
             feedback.selectionChanged()
+            sound.selectionTick()
         }
     }
 
@@ -187,6 +191,9 @@ final class LauncherViewModel {
     private func performLaunch(of item: LauncherItem) async {
         isLaunching = true
         feedback.launchImpact()
+        // Spoken as the portal opens rather than after it: the ceremony and the
+        // announcement are the same beat.
+        sound.announceLaunch(of: item.name)
         await runPortalCeremony()
 
         let outcome = await coordinator.launch(item)
@@ -197,6 +204,9 @@ final class LauncherViewModel {
             isLaunching = false
         case .failed:
             isLaunching = false
+            // Nothing opened, so the announcement is now wrong. Cut it before
+            // the alert explains what actually happened.
+            sound.cancelSpeech()
             feedback.failure()
             launchFailure = LaunchFailure(item: item)
         }

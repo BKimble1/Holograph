@@ -12,6 +12,7 @@ final class AppServices {
     let repository: LauncherRepository
     let launcher: AppLaunching
     let feedback: FeedbackProviding
+    let sound: SoundPlaying
     let selectionStore: SelectionStoring
     let iconProcessor: IconProcessor
     let metadataProvider: AppStoreMetadataProviding
@@ -20,6 +21,7 @@ final class AppServices {
         repository: LauncherRepository,
         launcher: AppLaunching,
         feedback: FeedbackProviding,
+        sound: SoundPlaying,
         selectionStore: SelectionStoring,
         iconProcessor: IconProcessor = IconProcessor(),
         metadataProvider: AppStoreMetadataProviding = AppStoreLookupService()
@@ -27,6 +29,7 @@ final class AppServices {
         self.repository = repository
         self.launcher = launcher
         self.feedback = feedback
+        self.sound = sound
         self.selectionStore = selectionStore
         self.iconProcessor = iconProcessor
         self.metadataProvider = metadataProvider
@@ -80,6 +83,10 @@ struct AppComposition {
         }
 
         let feedback: FeedbackProviding = environment.isUITesting ? SilentFeedback() : SystemFeedback()
+        // Tests must stay silent and deterministic, and nothing should try to
+        // start an audio engine inside a test host.
+        let staysQuiet = environment.isUITesting || LaunchEnvironment.isHostingUnitTests
+        let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
         let selectionStore: SelectionStoring = environment.isUITesting
             ? InMemorySelectionStore()
             : UserDefaultsSelectionStore()
@@ -88,6 +95,7 @@ struct AppComposition {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore
         )
 
@@ -100,6 +108,7 @@ struct AppComposition {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore,
             motion: motion
         )

@@ -102,6 +102,28 @@ A few decisions worth knowing about:
 
 ---
 
+## Sound
+
+Two accents, both on by default and both switchable in Settings:
+
+- **A tick as the carousel moves.** Synthesised rather than shipped as an audio
+  file — `HoloClick.waveform()` builds a 60 ms descending two-partial chirp under
+  a sharp exponential decay, with a bright transient on the leading edge. Being a
+  pure function of nothing, its shape is unit-tested directly: length, range,
+  decay, endpoints and the direction of the pitch sweep, with no audio hardware
+  involved.
+- **"Opening <app>" as one launches**, spoken by `AVSpeechSynthesizer` on the
+  same beat as the portal flourish. A refused launch cancels it, so the voice
+  never contradicts the recovery alert.
+
+The audio session is `.ambient` and mixes with others, so both follow the silent
+switch and never interrupt what is already playing. The announcement is
+suppressed while VoiceOver is running, which is already describing the tap.
+Everything is best-effort: a device that cannot start an audio engine simply
+stays quiet.
+
+---
+
 ## Accessibility
 
 - Reduce Motion swaps the continuous depth curve for a single scale step, stops

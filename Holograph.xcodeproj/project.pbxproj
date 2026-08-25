@@ -14,6 +14,7 @@
 		13277315FA1595FAD68DB32C /* AppStoreLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */; };
 		19A2718C7151CA2EA73485E4 /* EmptyLauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03956C5671B68FDCFE69DFCF /* EmptyLauncherView.swift */; };
 		23C8620555949AA228D6F7EF /* AppEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */; };
+		25BBAB3A7ACBA20C733D27F7 /* SoundFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */; };
 		26F1D6B8A66FB9A55B655AAD /* AccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F539C57FB878DB5F796B17 /* AccessibilityID.swift */; };
 		2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA647AD3FF45893A0F91BF3 /* StoredLauncherApp.swift */; };
 		2BE29D5DACEA3A8882C2C4A8 /* LauncherRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */; };
@@ -24,6 +25,7 @@
 		3EED5D27BC217F6E21FEA78F /* HoloTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3DC9D2858A257624060AB1 /* HoloTheme.swift */; };
 		4CC03438C803E6DD3D103100 /* PortalLaunchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */; };
 		4D44A4FB9FF0677BC1538FC6 /* IconProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */; };
+		51C725CBD28BC39F4855D38C /* SoundFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */; };
 		51F818343A8C821F3404AE5F /* IconArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */; };
 		61038835CF496632377F4205 /* LaunchEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */; };
 		633D42495B20B1AB39DE78FA /* PageIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5652E29C8518F769C113B7 /* PageIndicator.swift */; };
@@ -95,6 +97,7 @@
 		239FAC8B9251AA6EC0139A7E /* DemoContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContent.swift; sourceTree = "<group>"; };
 		2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidator.swift; sourceTree = "<group>"; };
 		2D39B4CBEC0FE2103BC9A6FE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFeedback.swift; sourceTree = "<group>"; };
 		33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceUITests.swift; sourceTree = "<group>"; };
 		341D02C7FA64F8F23F23639E /* HolographApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographApp.swift; sourceTree = "<group>"; };
 		38646CD3BC3EABD5F6B43584 /* LauncherItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherItem.swift; sourceTree = "<group>"; };
@@ -104,6 +107,7 @@
 		505B37E8AD6BBE7D77F87D5C /* HoloBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBackgroundView.swift; sourceTree = "<group>"; };
 		507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherRepositoryTests.swift; sourceTree = "<group>"; };
 		6038523860A1A525D191193E /* InMemoryLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryLauncherRepository.swift; sourceTree = "<group>"; };
+		6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFeedbackTests.swift; sourceTree = "<group>"; };
 		74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortalLaunchOverlay.swift; sourceTree = "<group>"; };
 		77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconProcessorTests.swift; sourceTree = "<group>"; };
 		77F539C57FB878DB5F796B17 /* AccessibilityID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityID.swift; sourceTree = "<group>"; };
@@ -302,6 +306,7 @@
 				F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */,
 				2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */,
 				A484FD65121E780E48A76D30 /* SelectionStore.swift */,
+				2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -328,6 +333,7 @@
 				507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */,
 				01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */,
 				4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */,
+				6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */,
 				1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */,
 			);
 			path = HolographTests;
@@ -507,6 +513,7 @@
 				3C9E61D37DF27C87E7936EC6 /* PreviewSupport.swift in Sources */,
 				307CBA5ED99317F1710FC881 /* SelectionStore.swift in Sources */,
 				7292FD8356B1C5D5B382BB4F /* SettingsSheet.swift in Sources */,
+				25BBAB3A7ACBA20C733D27F7 /* SoundFeedback.swift in Sources */,
 				2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */,
 				7F7EAF8B848406BEDC90A81B /* StubAppLauncher.swift in Sources */,
 				DCB8F952E7AC0137E5F5E43B /* SwiftDataLauncherRepository.swift in Sources */,
@@ -526,6 +533,7 @@
 				9477E227CF3AF0E556BD8DD1 /* LaunchURLValidatorTests.swift in Sources */,
 				2BE29D5DACEA3A8882C2C4A8 /* LauncherRepositoryTests.swift in Sources */,
 				E6230B7725CBF181FC4B229B /* LauncherViewModelTests.swift in Sources */,
+				51C725CBD28BC39F4855D38C /* SoundFeedbackTests.swift in Sources */,
 				F2F44FD4ABD035FB4C718FD8 /* TestFixtures.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

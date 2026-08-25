@@ -16,6 +16,7 @@ final class PreviewHarness {
         let repository = InMemoryLauncherRepository(items: items)
         let launcher = StubAppLauncher(outcome: launchSucceeds)
         let feedback = SilentFeedback()
+        let sound = SilentSound()
         let selectionStore = InMemorySelectionStore()
         let motion = HoloMotion()
 
@@ -23,6 +24,7 @@ final class PreviewHarness {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore,
             motion: motion
         )
@@ -34,6 +36,7 @@ final class PreviewHarness {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore,
             metadataProvider: PreviewMetadataProvider()
         )

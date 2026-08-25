@@ -8,6 +8,7 @@ final class LauncherViewModelTests: XCTestCase {
         let repository: InMemoryLauncherRepository
         let launcher: StubAppLauncher
         let feedback: SilentFeedback
+        let sound: SilentSound
         let selectionStore: InMemorySelectionStore
         let motion: HoloMotion
     }
@@ -20,6 +21,7 @@ final class LauncherViewModelTests: XCTestCase {
         let repository = InMemoryLauncherRepository(items: items)
         let launcher = StubAppLauncher(outcome: launchSucceeds)
         let feedback = SilentFeedback()
+        let sound = SilentSound()
         let selectionStore = InMemorySelectionStore(stored: rememberedSelection)
         // Testing mode collapses the launch ceremony to a single millisecond.
         let motion = HoloMotion(isDisabledForTesting: true)
@@ -27,6 +29,7 @@ final class LauncherViewModelTests: XCTestCase {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore,
             motion: motion
         )
@@ -35,6 +38,7 @@ final class LauncherViewModelTests: XCTestCase {
             repository: repository,
             launcher: launcher,
             feedback: feedback,
+            sound: sound,
             selectionStore: selectionStore,
             motion: motion
         )
@@ -200,6 +204,63 @@ final class LauncherViewModelTests: XCTestCase {
     }
 
     // MARK: - Launching
+
+    // MARK: - Sound
+
+    func testMovingBetweenAppsTicksOncePerApp() {
+        let harness = makeHarness(items: fiveItems())
+        harness.model.load()
+        XCTAssertEqual(harness.sound.tickCount, 0, "landing on the first app is not a move")
+
+        harness.model.selectNext()
+        harness.model.selectNext()
+        harness.model.selectPrevious()
+
+        XCTAssertEqual(harness.sound.tickCount, 3)
+    }
+
+    func testReselectingTheSameAppDoesNotTick() throws {
+        let harness = makeHarness(items: fiveItems())
+        harness.model.load()
+        let current = try XCTUnwrap(harness.model.selectedID)
+
+        harness.model.select(current)
+        harness.model.select(current)
+
+        XCTAssertEqual(harness.sound.tickCount, 0, "a scroll that settles where it began is silent")
+    }
+
+    func testLaunchingSpeaksTheAppName() async {
+        let harness = makeHarness(items: fiveItems())
+        harness.model.load()
+
+        await harness.model.launchSelected()
+
+        XCTAssertEqual(harness.sound.announcements, ["Charlie"])
+    }
+
+    func testARefusedLaunchCutsTheAnnouncement() async {
+        let harness = makeHarness(items: fiveItems(), launchSucceeds: false)
+        harness.model.load()
+
+        await harness.model.launchSelected()
+
+        // It said "Opening Charlie" and then nothing opened; leaving that
+        // hanging over the recovery alert would be worse than silence.
+        XCTAssertEqual(harness.sound.announcements, ["Charlie"])
+        XCTAssertEqual(harness.sound.cancelCount, 1)
+    }
+
+    func testCentringASideAppTicksWithoutAnnouncingIt() async {
+        let harness = makeHarness(items: fiveItems())
+        harness.model.load()
+        let neighbour = harness.model.items[0]
+
+        await harness.model.activate(neighbour)
+
+        XCTAssertEqual(harness.sound.tickCount, 1)
+        XCTAssertTrue(harness.sound.announcements.isEmpty, "nothing opened, so nothing is announced")
+    }
 
     func testLaunchingTheSelectedAppOpensItsPrimaryLink() async {
         let harness = makeHarness(items: fiveItems())
