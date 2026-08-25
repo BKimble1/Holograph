@@ -107,29 +107,48 @@ A few decisions worth knowing about:
 Off by default, switched on under **Settings → Air Gestures**. Flick a hand left
 or right in front of the screen, from a foot or two away, and the wall moves the
 way your hand went — the same direction a swipe on the glass already moves it.
+Gather your fingers and throw them open to launch the centred app.
 
 Nothing on an iPad reports a hand waving in mid-air: there is no proximity or
 depth API for it, and ARKit body tracking is far heavier than the question
 deserves. `VNDetectHumanHandPoseRequest` returns 21 landmarks per hand from an
 ordinary camera frame, and at one to two feet the hand fills enough of the frame
-that a 640×480 feed tracks it comfortably. The gesture needs exactly one number —
-where the hand sits across the frame — so the feed is deliberately small and
-slow: VGA at roughly 18 readings a second, late frames discarded. The connection
-is mirrored, so moving your hand right moves it right in the frame, and kept
-upright as the iPad turns.
+that a 640×480 feed tracks it comfortably. The feed is deliberately small and
+slow — VGA at roughly 18 readings a second, late frames discarded. The
+connection is mirrored, so moving your hand right moves it right in the frame,
+and kept upright as the iPad turns.
 
-Position is averaged over the wrist and the knuckles rather than read off a
-fingertip, because knuckles stay put while fingers curl. `AirSwipeDetector` then
-decides what counts: how far the hand crossed, how fast, and how straight the
-path was, followed by a cooldown so the return stroke is not read as the
-opposite swipe. It is a value type over plain numbers, so every one of those
-rules is unit-tested by playing a hand through it frame by frame — a flick, a
-drift, a small wave, a wandering path, a hand leaving the frame.
+### Measured in hands, not in pixels
+
+The same six-inch flick covers about half the frame at a foot and a quarter of
+it at two, so a threshold in frame-fractions means a different gesture at every
+distance. Every threshold here is instead expressed in **knuckle spans** — the
+width of the hand across the index and little-finger knuckles, about 3.3 inches,
+and the one measurement on a hand that barely changes as the fingers move. A
+six-inch flick is 1.8 spans whether you are close or far.
+
+The same ruler gives the burst: fingertip spread is measured in spans too, so
+gathered fingers read low and a thrown-open hand reads high regardless of
+distance.
+
+### What counts
+
+`AirGestureDetector` decides, from how far the hand crossed, how fast, and how
+straight the path was. Reversing is treated differently from repeating: after a
+flick the hand has to come back, and that return journey is not a gesture — it
+is the cost of having made one. So the same flick counts again quickly, while
+the opposite one has to wait long enough to be meant.
+
+It is a value type over plain numbers, so all of it is unit-tested by playing a
+hand through it frame by frame, with distances written in inches: a six-inch
+flick, a ten-inch flick, a three-inch nudge, the same distance taken slowly, a
+path that doubles back, a hand leaving the frame, a return stroke, a deliberate
+reverse, fingers thrown open, a hand already open, and a slow unfurl.
 
 The camera runs only while the launcher is on screen, the feature is on, and the
 scene is active — never behind Settings, never in the background. Nothing is
 recorded and no video leaves the device; frames are analysed and dropped, and the
-only thing that leaves the detector is a direction.
+only thing that leaves the detector is a gesture.
 
 ---
 
@@ -144,11 +163,15 @@ Two accents, both on by default and both switchable in Settings:
   a seeded generator, so the sound is identical every time and its shape is
   unit-tested directly: how quickly it peaks, how fast it collapses, and that the
   attack is broadband rather than a pitch.
-- **"Opening <app>" as one launches**, in a British woman's voice, unhurried and
-  level. `HoloVoice` ranks the installed voices — accent first, then the voice,
-  then the quality of the recording — and degrades to any English voice rather
-  than falling silent on a device with no en-GB voice installed. A refused launch
-  cancels it, so the voice never contradicts the recovery alert.
+- **"Opening <app>" as one launches**, in a woman's voice, unhurried and level.
+  `HoloVoice` ranks the installed voices — a woman first, then British, then the
+  particular voice, then the quality of the recording. Gender comes from a list
+  of Apple's own voice names before the API's `gender`, because plenty of
+  installed voices report none at all, and a stock British device that has only
+  Daniel installed will otherwise hand you a man. For the best result, download
+  an English (UK) voice such as Serena under **Settings → Accessibility → Spoken
+  Content → Voices**. A refused launch cancels the announcement, so the voice
+  never contradicts the recovery alert.
 
 The session is `.playback` with `.mixWithOthers`. `.ambient` would be the politer
 category, but it is silenced by the Ring/Silent switch — the Control Centre

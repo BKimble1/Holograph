@@ -214,16 +214,23 @@ struct LauncherScreen: View {
         // this body, and a copied view struct would be a stale thing to hold.
         let model = model
         let motion = motion
-        services.airGestures.onSwipe = { swipe in
+        services.airGestures.onGesture = { gesture in
             guard !model.isEmpty else { return }
-            // The wall moves the way the hand went, which is how a swipe on the
-            // glass already behaves: push the apps left and the next one
-            // arrives from the right.
-            withAnimation(motion.transition) {
-                switch swipe {
-                case .left: model.selectNext()
-                case .right: model.selectPrevious()
+            switch gesture {
+            case .swipe(let direction):
+                // The wall moves the way the hand went, which is how a swipe on
+                // the glass already behaves: push the apps left and the next one
+                // arrives from the right.
+                withAnimation(motion.transition) {
+                    switch direction {
+                    case .left: model.selectNext()
+                    case .right: model.selectPrevious()
+                    }
                 }
+            case .burst:
+                // Fingers thrown open: the same thing tapping the centred tile
+                // does, ceremony and all.
+                Task { await model.launchSelected() }
             }
         }
         services.airGestures.start()

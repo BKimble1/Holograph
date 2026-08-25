@@ -190,53 +190,77 @@ enum HoloClick {
 
 // MARK: - The voice
 
-/// Picks the voice the launcher speaks in: a British woman, calm and composed —
-/// the register of an assistant reading something back to you.
+/// Picks the voice the launcher speaks in: a woman, British if the device has
+/// one — composed and unhurried rather than bright and quick.
 ///
 /// The choice is made over plain descriptions rather than `AVSpeechSynthesisVoice`
 /// so the ranking can be tested. Which voices exist depends on the device and on
 /// what the owner has downloaded, so this has to degrade rather than assume.
 enum HoloVoice {
+    enum ReportedGender: Equatable {
+        case female
+        case male
+        case unspecified
+    }
+
     struct Candidate: Equatable {
         let identifier: String
         let name: String
         /// BCP-47, e.g. "en-GB".
         let language: String
-        let isFemale: Bool
+        let reportedGender: ReportedGender
         /// AVSpeechSynthesisVoiceQuality's raw value: default 1, enhanced 2,
         /// premium 3. Higher sounds markedly less synthetic.
         let quality: Int
     }
 
-    /// British female voices Apple ships, best first. Named explicitly because
-    /// the API cannot say which of two en-GB voices sounds more like a composed
-    /// assistant and which sounds like a station announcement.
+    /// Apple's English voices, by name.
+    ///
+    /// The API's own gender is not enough: plenty of installed voices report
+    /// `.unspecified`, and when nothing looks female the ranking falls through
+    /// to whatever else is installed — which on a stock British device is
+    /// Daniel, a man. Naming them is what stops that.
+    static let femaleNames: Set<String> = [
+        "Serena", "Stephanie", "Kate", "Martha", "Fiona", "Emily",
+        "Samantha", "Ava", "Allison", "Susan", "Zoe", "Nicky",
+        "Karen", "Catherine", "Moira", "Tessa",
+    ]
+
+    static let maleNames: Set<String> = [
+        "Daniel", "Oliver", "Arthur", "Malcolm", "Graham",
+        "Alex", "Fred", "Tom", "Aaron", "Rishi", "Gordon", "Lee",
+    ]
+
+    /// British women, best first. The API cannot say which of two voices sounds
+    /// like a composed assistant and which sounds like a station announcement.
     static let preferredNames = ["Serena", "Stephanie", "Kate", "Martha"]
 
-    /// Picks the best available voice, or `nil` to let the system choose.
-    ///
-    /// British English first; failing that any English, so a device with no
-    /// en-GB voice still speaks rather than falling silent.
-    static func best(from candidates: [Candidate]) -> Candidate? {
-        let british = candidates.filter { $0.language.hasPrefix("en-GB") }
-        let pool = british.isEmpty ? candidates.filter { $0.language.hasPrefix("en") } : british
-        guard !pool.isEmpty else { return nil }
+    static func isFemale(_ candidate: Candidate) -> Bool {
+        if maleNames.contains(candidate.name) { return false }
+        if femaleNames.contains(candidate.name) { return true }
+        return candidate.reportedGender == .female
+    }
 
-        // Arrays are not Comparable; the ranking is lexicographic by intent, so
-        // say so rather than collapsing it into one number and losing the order.
-        return pool.max { first, second in
+    /// Picks the best available voice, or `nil` to let the system choose.
+    static func best(from candidates: [Candidate]) -> Candidate? {
+        let english = candidates.filter { $0.language.hasPrefix("en") }
+        guard !english.isEmpty else { return nil }
+        return english.max { first, second in
             rank(first).lexicographicallyPrecedes(rank(second))
         }
     }
 
-    /// Higher sorts better. Ordered by what actually matters to the ear: the
-    /// right accent, then the right voice, then how good the recording is.
+    /// Higher sorts better.
+    ///
+    /// Being a woman outranks the accent, deliberately. A British man is not a
+    /// closer match to what was asked for than a woman who is not British, and
+    /// a stock device often has no British woman installed at all.
     private static func rank(_ candidate: Candidate) -> [Int] {
         let namePreference = preferredNames.firstIndex(of: candidate.name)
             .map { preferredNames.count - $0 } ?? 0
         return [
+            isFemale(candidate) ? 1 : 0,
             candidate.language.hasPrefix("en-GB") ? 1 : 0,
-            candidate.isFemale ? 1 : 0,
             namePreference,
             candidate.quality,
         ]
@@ -286,8 +310,8 @@ final class SystemSound: SoundPlaying {
         utterance.voice = preferredVoice()
         // Unhurried and level. The default rate clips along, and a raised pitch
         // reads as eager; neither is the register wanted here.
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.94
-        utterance.pitchMultiplier = 0.98
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.92
+        utterance.pitchMultiplier = 0.96
         utterance.postUtteranceDelay = 0
         utterance.volume = 0.95
         synthesizer.speak(utterance)
@@ -304,11 +328,17 @@ final class SystemSound: SoundPlaying {
     private func preferredVoice() -> AVSpeechSynthesisVoice? {
         if let cachedVoice { return cachedVoice }
         let candidates = AVSpeechSynthesisVoice.speechVoices().map { voice in
-            HoloVoice.Candidate(
+            let gender: HoloVoice.ReportedGender
+            switch voice.gender {
+            case .female: gender = .female
+            case .male: gender = .male
+            default: gender = .unspecified
+            }
+            return HoloVoice.Candidate(
                 identifier: voice.identifier,
                 name: voice.name,
                 language: voice.language,
-                isFemale: voice.gender == .female,
+                reportedGender: gender,
                 quality: voice.quality.rawValue
             )
         }

@@ -159,39 +159,56 @@ final class HoloVoiceTests: XCTestCase {
     private func candidate(
         _ name: String,
         _ language: String = "en-GB",
-        female: Bool = true,
+        gender: HoloVoice.ReportedGender = .unspecified,
         quality: Int = 1
     ) -> HoloVoice.Candidate {
         HoloVoice.Candidate(
             identifier: "id.\(name)", name: name,
-            language: language, isFemale: female, quality: quality
+            language: language, reportedGender: gender, quality: quality
         )
     }
 
     func testItPrefersABritishWoman() {
         let chosen = HoloVoice.best(from: [
-            candidate("Daniel", female: false),
+            candidate("Daniel"),
             candidate("Samantha", "en-US"),
             candidate("Serena"),
         ])
         XCTAssertEqual(chosen?.name, "Serena")
     }
 
-    func testAccentOutranksEverythingElse() {
-        // A premium American voice is still the wrong accent.
+    /// The bug from the device: a stock British iPad often has only Daniel
+    /// installed, and ranking accent above gender picked him.
+    func testAWomanIsPreferredOverABritishMan() {
+        let chosen = HoloVoice.best(from: [
+            candidate("Daniel", "en-GB", quality: 3),
+            candidate("Samantha", "en-US", quality: 1),
+        ])
+        XCTAssertEqual(chosen?.name, "Samantha", "a woman first, even if not British")
+    }
+
+    func testNamesDecideGenderWhenTheSystemWillNotSay() {
+        // Plenty of installed voices report no gender at all, which is how a
+        // man got picked in the first place.
+        XCTAssertTrue(HoloVoice.isFemale(candidate("Serena", gender: .unspecified)))
+        XCTAssertFalse(HoloVoice.isFemale(candidate("Daniel", gender: .unspecified)))
+    }
+
+    func testAKnownMansNameIsNotOverriddenByTheSystem() {
+        XCTAssertFalse(HoloVoice.isFemale(candidate("Daniel", gender: .female)))
+    }
+
+    func testTheSystemDecidesForVoicesItDoesNotRecognise() {
+        XCTAssertTrue(HoloVoice.isFemale(candidate("Unheard-of", gender: .female)))
+        XCTAssertFalse(HoloVoice.isFemale(candidate("Unheard-of", gender: .male)))
+    }
+
+    func testAccentSeparatesTwoWomen() {
         let chosen = HoloVoice.best(from: [
             candidate("Ava", "en-US", quality: 3),
             candidate("Kate", "en-GB", quality: 1),
         ])
         XCTAssertEqual(chosen?.name, "Kate")
-    }
-
-    func testAWomanOutranksABetterRecordingOfAMan() {
-        let chosen = HoloVoice.best(from: [
-            candidate("Daniel", female: false, quality: 3),
-            candidate("Martha", quality: 1),
-        ])
-        XCTAssertEqual(chosen?.name, "Martha")
     }
 
     func testAmongEqualsTheBetterRecordingWins() {
@@ -200,14 +217,6 @@ final class HoloVoiceTests: XCTestCase {
             candidate("Serena", quality: 3),
         ])
         XCTAssertEqual(chosen?.quality, 3)
-    }
-
-    func testItFallsBackToAnyEnglishRatherThanSayingNothing() {
-        let chosen = HoloVoice.best(from: [
-            candidate("Samantha", "en-US"),
-            candidate("Amelie", "fr-FR"),
-        ])
-        XCTAssertEqual(chosen?.name, "Samantha")
     }
 
     func testNoEnglishVoiceLeavesTheChoiceToTheSystem() {

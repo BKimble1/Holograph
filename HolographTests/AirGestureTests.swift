@@ -1,141 +1,187 @@
 import XCTest
 @testable import Holograph
 
-/// The gesture logic is a value type over plain numbers, so a swipe can be
-/// played through it frame by frame — no camera, no hand, no running app.
-final class AirSwipeDetectorTests: XCTestCase {
-    private let thresholds = AirSwipeDetector.Thresholds.default
+/// The gesture logic is a value type over plain numbers, so a hand can be played
+/// through it frame by frame — no camera, no hand, no running app.
+///
+/// Distances are written in inches and converted, because inches are what the
+/// gesture was asked for in. A hand is about 3.3 inches across the knuckles, and
+/// every threshold is in those spans, so the same flick works at any distance
+/// from the screen.
+final class AirGestureDetectorTests: XCTestCase {
+    private let thresholds = AirGestureDetector.Thresholds.default
 
-    /// Plays a hand travelling from `from` to `to` over `duration`, at the rate
-    /// the camera actually samples. Returns every swipe that fired.
-    private func play(
-        from start: Double,
-        to end: Double,
+    /// Knuckle span of an adult hand, the ruler everything is measured against.
+    private static let spanInInches = 3.3
+    private func spans(_ inches: Double) -> Double { inches / Self.spanInInches }
+
+    /// Plays a hand travelling `inches` at the rate the camera samples.
+    @discardableResult
+    private func flick(
+        _ inches: Double,
         over duration: TimeInterval,
         startingAt origin: TimeInterval = 100,
-        frameRate: Double = 18,
-        into detector: inout AirSwipeDetector
-    ) -> [AirSwipe] {
-        let steps = max(1, Int((duration * frameRate).rounded()))
-        var fired: [AirSwipe] = []
+        from start: Double = 0,
+        spread: Double = 0.8,
+        into detector: inout AirGestureDetector
+    ) -> [AirGesture] {
+        let steps = max(1, Int((duration * 18).rounded()))
+        var fired: [AirGesture] = []
         for step in 0...steps {
             let progress = Double(step) / Double(steps)
-            let x = start + (end - start) * progress
-            let time = origin + duration * progress
-            if let swipe = detector.handSeen(atX: x, time: time) { fired.append(swipe) }
+            let reading = HandReading(x: start + spans(inches) * progress, spread: spread)
+            if let gesture = detector.handSeen(reading, time: origin + duration * progress) {
+                fired.append(gesture)
+            }
         }
         return fired
     }
 
-    // MARK: - What should fire
+    // MARK: - Swipes that should register
 
-    func testAFlickToTheRightIsASwipeRight() {
-        var detector = AirSwipeDetector()
-        let fired = play(from: 0.3, to: 0.75, over: 0.25, into: &detector)
-        XCTAssertEqual(fired, [.right])
+    func testASixInchFlickIsASwipe() {
+        var detector = AirGestureDetector()
+        XCTAssertEqual(flick(6, over: 0.30, into: &detector), [.swipe(.right)])
     }
 
-    func testAFlickToTheLeftIsASwipeLeft() {
-        var detector = AirSwipeDetector()
-        let fired = play(from: 0.75, to: 0.25, over: 0.25, into: &detector)
-        XCTAssertEqual(fired, [.left])
+    func testATenInchFlickIsASwipe() {
+        var detector = AirGestureDetector()
+        XCTAssertEqual(flick(-10, over: 0.35, from: spans(10), into: &detector), [.swipe(.left)])
     }
 
-    func testOneFlickFiresOnlyOnce() {
-        var detector = AirSwipeDetector()
-        let fired = play(from: 0.2, to: 0.85, over: 0.3, into: &detector)
-        XCTAssertEqual(fired.count, 1, "a single gesture must not repeat as it continues")
+    func testTheSameFlickRepeatedKeepsWorking() {
+        var detector = AirGestureDetector()
+        XCTAssertEqual(flick(7, over: 0.28, into: &detector), [.swipe(.right)])
+        detector.handLost()
+        // Repeating a deliberate gesture should feel immediate.
+        XCTAssertEqual(
+            flick(7, over: 0.28, startingAt: 100.8, into: &detector),
+            [.swipe(.right)]
+        )
     }
 
-    // MARK: - What should not
+    // MARK: - Swipes that should not
 
-    func testAHandDriftingAcrossIsNotAFlick() {
-        var detector = AirSwipeDetector()
-        // Same distance, four times as long: someone reaching past the iPad.
-        let fired = play(from: 0.2, to: 0.8, over: 2.0, into: &detector)
-        XCTAssertTrue(fired.isEmpty, "slow travel is not a gesture")
+    func testAThreeInchNudgeIsNotASwipe() {
+        var detector = AirGestureDetector()
+        XCTAssertTrue(flick(3, over: 0.25, into: &detector).isEmpty)
     }
 
-    func testASmallMovementIsNotAFlick() {
-        var detector = AirSwipeDetector()
-        let fired = play(from: 0.48, to: 0.56, over: 0.2, into: &detector)
-        XCTAssertTrue(fired.isEmpty, "a hand shifting slightly should be ignored")
+    func testASixInchMoveMadeSlowlyIsNotASwipe() {
+        var detector = AirGestureDetector()
+        // Far enough, but taken at a stroll — someone reaching past the iPad.
+        XCTAssertTrue(flick(6, over: 1.0, into: &detector).isEmpty)
     }
 
-    func testASmallWaveIsNotAFlick() {
-        var detector = AirSwipeDetector()
-        // Hello-style waving: quick, but never crossing much of the frame.
-        var fired = play(from: 0.50, to: 0.62, over: 0.12, into: &detector)
-        fired += play(from: 0.62, to: 0.50, over: 0.12, startingAt: 100.12, into: &detector)
-        fired += play(from: 0.50, to: 0.62, over: 0.12, startingAt: 100.24, into: &detector)
-        XCTAssertTrue(fired.isEmpty, "waving is not flicking")
+    /// The one that mattered: the hand has to come back after a flick, and that
+    /// return journey was being read as a swipe the other way.
+    func testTheHandComingBackDoesNotUndoTheSwipe() {
+        var detector = AirGestureDetector()
+        XCTAssertEqual(flick(8, over: 0.30, into: &detector), [.swipe(.right)])
+
+        let returning = flick(
+            -8, over: 0.30, startingAt: 100.45, from: spans(8), into: &detector
+        )
+        XCTAssertTrue(returning.isEmpty, "bringing the hand back is not a gesture")
+    }
+
+    func testADeliberateReverseIsStillHeard() {
+        var detector = AirGestureDetector()
+        XCTAssertEqual(flick(8, over: 0.30, into: &detector), [.swipe(.right)])
+        detector.handLost()
+
+        // Long enough afterwards to be meant rather than incidental.
+        let back = flick(-8, over: 0.30, startingAt: 101.9, from: spans(8), into: &detector)
+        XCTAssertEqual(back, [.swipe(.left)])
     }
 
     func testAWanderingPathIsNotASwipeEvenWhenItEndsFarAway() {
-        var detector = AirSwipeDetector()
-        // Ends 0.30 to the right of where it began — far enough on distance
-        // alone — but doubles back twice getting there. A flick does not.
+        var detector = AirGestureDetector()
         let path: [(x: Double, time: TimeInterval)] = [
-            (0.30, 100.00),
-            (0.55, 100.06),
-            (0.35, 100.12),
-            (0.60, 100.18),
+            (spans(0), 100.00),
+            (spans(7), 100.06),
+            (spans(1), 100.12),
+            (spans(8), 100.18),
         ]
-        let fired = path.compactMap { detector.handSeen(atX: $0.x, time: $0.time) }
+        let fired = path.compactMap {
+            detector.handSeen(HandReading(x: $0.x, spread: 0.8), time: $0.time)
+        }
         XCTAssertTrue(fired.isEmpty, "a swipe is a straight line, not a search")
     }
 
     func testAHandLeavingTheFrameAbandonsThePath() {
-        var detector = AirSwipeDetector()
-        // Short of a flick on its own, so nothing has fired yet.
-        XCTAssertTrue(play(from: 0.20, to: 0.38, over: 0.12, into: &detector).isEmpty)
+        var detector = AirGestureDetector()
+        XCTAssertTrue(flick(3, over: 0.12, into: &detector).isEmpty)
 
         detector.handLost()
         XCTAssertEqual(detector.sampleCount, 0)
 
-        // The hand reappears at the far side. Joined to what came before, that
-        // is a wide fast sweep; it must not be read as one.
-        let fired = play(from: 0.75, to: 0.80, over: 0.10, startingAt: 100.15, into: &detector)
+        // Reappearing far away must not join up into one long sweep.
+        let fired = flick(1, over: 0.10, startingAt: 100.15, from: spans(9), into: &detector)
         XCTAssertTrue(fired.isEmpty)
     }
 
-    func testTooFewSamplesIsNotEnoughToJudge() {
-        var detector = AirSwipeDetector()
-        // Two frames could be a tracking glitch jumping across the frame.
-        XCTAssertNil(detector.handSeen(atX: 0.2, time: 100))
-        XCTAssertNil(detector.handSeen(atX: 0.9, time: 100.08))
-    }
-
     func testFramesArrivingOutOfOrderAreIgnored() {
-        var detector = AirSwipeDetector()
-        _ = detector.handSeen(atX: 0.3, time: 100)
-        _ = detector.handSeen(atX: 0.4, time: 100.06)
+        var detector = AirGestureDetector()
+        _ = detector.handSeen(HandReading(x: 0.3, spread: 0.8), time: 100)
+        _ = detector.handSeen(HandReading(x: 0.6, spread: 0.8), time: 100.06)
         let before = detector.sampleCount
-        XCTAssertNil(detector.handSeen(atX: 0.9, time: 99.9), "a stale frame is not new information")
+
+        XCTAssertNil(
+            detector.handSeen(HandReading(x: 4, spread: 0.8), time: 99.9),
+            "a stale frame is not new information"
+        )
         XCTAssertEqual(detector.sampleCount, before)
     }
 
-    // MARK: - Repeating
+    // MARK: - The burst
 
-    func testTheReturnStrokeDoesNotFireTheOppositeSwipe() {
-        var detector = AirSwipeDetector()
-        let out = play(from: 0.2, to: 0.8, over: 0.25, into: &detector)
-        XCTAssertEqual(out, [.right])
-
-        // Bringing the hand straight back, immediately — the classic false
-        // positive, and the reason there is a cooldown at all.
-        let back = play(from: 0.8, to: 0.2, over: 0.25, startingAt: 100.26, into: &detector)
-        XCTAssertTrue(back.isEmpty, "the hand coming back is not a swipe the other way")
+    /// Fingers gathered in the middle and thrown open.
+    private func burst(
+        _ spreads: [Double],
+        startingAt origin: TimeInterval = 100,
+        into detector: inout AirGestureDetector
+    ) -> [AirGesture] {
+        spreads.enumerated().compactMap { index, spread in
+            detector.handSeen(
+                HandReading(x: 0, spread: spread),
+                time: origin + Double(index) * 0.06
+            )
+        }
     }
 
-    func testASecondFlickAfterTheCooldownIsHeard() {
-        var detector = AirSwipeDetector()
-        XCTAssertEqual(play(from: 0.2, to: 0.8, over: 0.25, into: &detector), [.right])
+    func testFingersThrownOpenIsABurst() {
+        var detector = AirGestureDetector()
+        let fired = burst([0.45, 0.50, 0.75, 1.05, 1.20], into: &detector)
+        XCTAssertEqual(fired, [.burst])
+    }
 
-        let later = 100 + 0.25 + thresholds.cooldown + 0.1
-        detector.handLost()
-        let again = play(from: 0.2, to: 0.8, over: 0.25, startingAt: later, into: &detector)
-        XCTAssertEqual(again, [.right], "deliberate repeats have to keep working")
+    func testAHandThatIsAlreadyOpenIsNotABurst() {
+        var detector = AirGestureDetector()
+        // Holding an open hand up should not keep launching things.
+        let fired = burst(Array(repeating: 1.15, count: 6), into: &detector)
+        XCTAssertTrue(fired.isEmpty)
+    }
+
+    func testASlowUnfurlIsNotABurst() {
+        var detector = AirGestureDetector()
+        let spreads = (0..<24).map { 0.45 + (1.25 - 0.45) * Double($0) / 23 }
+        var fired: [AirGesture] = []
+        for (index, spread) in spreads.enumerated() {
+            if let gesture = detector.handSeen(
+                HandReading(x: 0, spread: spread),
+                time: 100 + Double(index) * 0.065
+            ) {
+                fired.append(gesture)
+            }
+        }
+        XCTAssertTrue(fired.isEmpty, "a burst is thrown open, not unfolded")
+    }
+
+    func testABurstDoesNotAlsoCountAsASwipe() {
+        var detector = AirGestureDetector()
+        // The hand stays put while the fingers open, so nothing has travelled.
+        XCTAssertEqual(burst([0.45, 0.50, 0.75, 1.05, 1.20], into: &detector), [.burst])
     }
 
     // MARK: - Wiring
@@ -143,15 +189,15 @@ final class AirSwipeDetectorTests: XCTestCase {
     @MainActor
     func testTheStubReportsWhatTheLauncherAskedItToDo() {
         let source = InertAirGestureSource()
-        var seen: [AirSwipe] = []
-        source.onSwipe = { seen.append($0) }
+        var seen: [AirGesture] = []
+        source.onGesture = { seen.append($0) }
 
         source.start()
-        source.emit(.left)
-        source.emit(.right)
+        source.emit(.swipe(.left))
+        source.emit(.burst)
         source.stop()
 
-        XCTAssertEqual(seen, [.left, .right])
+        XCTAssertEqual(seen, [.swipe(.left), .burst])
         XCTAssertEqual(source.startCount, 1)
         XCTAssertEqual(source.stopCount, 1)
         XCTAssertFalse(source.isWatching)
