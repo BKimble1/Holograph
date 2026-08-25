@@ -556,9 +556,23 @@ def build_configurations(target_uids: dict[str, str]) -> dict[str, dict[str, dic
         "TEST_TARGET_NAME": APP_TARGET,
     }
 
+    app_release = dict(app_common)
+    app_release.update(
+        {
+            # The archive is signed for distribution. Automatic signing derives
+            # which kind of profile to provision from this setting: left at the
+            # SDK default ("Apple Development") it asks for a development
+            # profile, and those are built from registered device UDIDs — which
+            # a team that ships only through TestFlight has none of. Release is
+            # used for the device archive alone; the simulator test build is
+            # Debug and keeps signing itself the ordinary way.
+            "CODE_SIGN_IDENTITY": "Apple Distribution",
+        }
+    )
+
     return {
         "project": {"Debug": project_debug, "Release": project_release},
-        APP_TARGET: {"Debug": dict(app_common), "Release": dict(app_common)},
+        APP_TARGET: {"Debug": dict(app_common), "Release": app_release},
         UNIT_TARGET: {"Debug": dict(unit_common), "Release": dict(unit_common)},
         UI_TARGET: {"Debug": dict(ui_common), "Release": dict(ui_common)},
     }
