@@ -56,7 +56,8 @@ enum HoloClick {
     static var frameCount: Int { Int(sampleRate * duration) }
 
     /// A descending two-partial chirp under a sharp exponential decay, with a
-    /// brief bright transient on the leading edge.
+    /// brief bright transient on the leading edge, ramped in over 0.8 ms and
+    /// faded out at the tail.
     ///
     /// The downward sweep is what makes it read as synthetic rather than
     /// mechanical; the transient is what makes it read as a *click* rather than
@@ -69,6 +70,9 @@ enum HoloClick {
         let endFrequency = 780.0
         let decay = 18.0          // amplitude e-folding time in milliseconds
         let transientDecay = 5.0
+        // Short enough to still read as a click, long enough that the buffer
+        // does not open on a step.
+        let attack = 0.8
 
         var samples = [Float](repeating: 0, count: frames)
         // Phase is integrated rather than computed per sample: a sweep needs the
@@ -92,10 +96,12 @@ enum HoloClick {
             value += sin(octavePhase) * 0.18 * envelope
             value += sin(phase * 3.1) * 0.20 * transient
 
-            // A short fade at the tail so the buffer never ends on a step, which
-            // would be audible as a second click.
-            let fade = progress > 0.85 ? (1 - (progress - 0.85) / 0.15) : 1
-            samples[frame] = Float(max(-1, min(1, value * 0.42 * fade)))
+            // Ramp in and fade out, so the buffer neither opens nor closes on a
+            // step. A hard edge at either end is heard as an extra click of its
+            // own — and at the leading edge it thumps.
+            let rampIn = min(1, milliseconds / attack)
+            let fadeOut = progress > 0.85 ? (1 - (progress - 0.85) / 0.15) : 1
+            samples[frame] = Float(max(-1, min(1, value * 0.42 * rampIn * fadeOut)))
         }
         return samples
     }
