@@ -39,6 +39,14 @@ final class HoloMotion {
         return HoloTheme.selectionAnimation
     }
 
+    /// How long the loading screen holds before the launcher takes over. Short
+    /// under test so the suite is not paced by an animation.
+    var introDuration: Duration {
+        if isDisabledForTesting { return .milliseconds(600) }
+        if prefersReducedMotion { return .milliseconds(900) }
+        return .milliseconds(1700)
+    }
+
     /// How long the portal effect runs before the deep link is opened.
     var launchCeremonyDuration: Duration {
         if isDisabledForTesting { return .milliseconds(1) }

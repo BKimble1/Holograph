@@ -18,22 +18,41 @@ class LauncherUITestCase: XCTestCase {
         case fails
     }
 
+    enum Animations {
+        /// The default for behavioural tests: continuous effects off and the
+        /// loading screen shortened, so the suite is not paced by animation.
+        case shortened
+        /// Full-length motion, for photographing the loading screen.
+        case full
+    }
+
     var app: XCUIApplication!
 
     @discardableResult
-    func launchApp(seed: Seed, launcher: LaunchStub = .succeeds) -> XCUIApplication {
+    func launchApp(
+        seed: Seed,
+        launcher: LaunchStub = .succeeds,
+        animations: Animations = .shortened
+    ) -> XCUIApplication {
         continueAfterFailure = false
         let application = XCUIApplication()
-        application.launchArguments = [
+        var arguments = [
             "-uiTesting",
             "-inMemoryStore",
-            "-disableAnimations",
             seed == .demoApps ? "-seedDemoApps" : "-seedEmpty",
             launcher == .succeeds ? "-mockLaunchSuccess" : "-mockLaunchFailure"
         ]
+        if animations == .shortened {
+            arguments.append("-disableAnimations")
+        }
+        application.launchArguments = arguments
         application.launch()
         app = application
         return application
+    }
+
+    var loadingScreen: XCUIElement {
+        app.descendants(matching: .any)[AccessibilityIdentifiers.loadingScreen].firstMatch
     }
 
     // MARK: - Element accessors
@@ -110,4 +129,12 @@ class LauncherUITestCase: XCTestCase {
         }
         element.typeText(text)
     }
+}
+
+/// Mirrors `AccessibilityID` in the app target. UI tests run out of process, so
+/// they cannot import it — keeping the strings in one place here means a rename
+/// is a single edit on each side.
+enum AccessibilityIdentifiers {
+    static let loadingScreen = "loading.screen"
+    static let poweredByIdlery = "loading.poweredByIdlery"
 }

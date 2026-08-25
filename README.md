@@ -27,6 +27,24 @@ blank; delete them and they stay gone.
 To add your own app you need the URL scheme it registers with iPadOS — see
 [`DEEP_LINK_INTEGRATION.md`](DEEP_LINK_INTEGRATION.md).
 
+### Artwork
+
+Source artwork lives in `Art/` and is the only thing a designer needs to touch:
+
+| File | Becomes |
+| ---- | ------- |
+| `Art/HoloIcon.png` | the 1024×1024 app icon, and the loading screen's mark |
+| `Art/IdleryWordmark.png` | the "powered by idlery" credit on the loading screen |
+
+```bash
+python3 Scripts/prepare_artwork.py   # regenerates the asset catalog images
+```
+
+The app icon is flattened to opaque RGB, since the App Store rejects icons with
+an alpha channel. The other two are keyed to transparency — the mark by its own
+luminance, the wordmark by removing its white paper — so both sit on the
+launcher's backdrop without a visible edge.
+
 ### Regenerating the Xcode project
 
 `IdleryLauncher.xcodeproj` is generated from the file tree so adding a source
@@ -77,6 +95,10 @@ A few decisions worth knowing about:
 - **Overlays add light, they do not replace colour.** The glass, scan lines and
   shimmer composite with `.screen` and `.plusLighter` at low opacity, so an
   orange tag still reads as orange.
+- **The app opens on a loading screen.** The launcher mark settles onto its
+  pedestal over the same backdrop the launcher uses, with "powered by idlery" in
+  small print along the bottom, then cross-fades to the carousel. The launcher
+  is not mounted underneath it, so nothing is reachable before it is usable.
 
 ---
 
@@ -103,7 +125,7 @@ receive them, so the shipping app always takes the production path.
 | `-inMemoryStore`       | SwiftData store held in memory only               |
 | `-seedDemoApps`        | Replace the library with the five demo tiles      |
 | `-seedEmpty`           | Empty library, to exercise the empty state        |
-| `-disableAnimations`   | Stop continuous effects, collapse the ceremony    |
+| `-disableAnimations`   | Stop continuous effects, shorten the loading screen |
 | `-mockLaunchSuccess`   | `AppLaunching` reports success without switching  |
 | `-mockLaunchFailure`   | `AppLaunching` reports failure                    |
 

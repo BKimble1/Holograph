@@ -1,6 +1,19 @@
 import XCTest
 
 final class LauncherFlowUITests: LauncherUITestCase {
+    func testTheAppOpensOnTheLoadingScreenAndThenHandsOver() {
+        launchApp(seed: .demoApps, animations: .full)
+
+        XCTAssertTrue(loadingScreen.waitForExistence(timeout: 20), "The app should open on the loading screen")
+        XCTAssertTrue(
+            app.descendants(matching: .any)[AccessibilityIdentifiers.poweredByIdlery].firstMatch.exists,
+            "The loading screen carries the Idlery credit"
+        )
+
+        XCTAssertTrue(selectedAppName.waitForExistence(timeout: 20), "The launcher should take over on its own")
+        XCTAssertFalse(loadingScreen.waitForExistence(timeout: 3), "The loading screen should be gone")
+    }
+
     func testEmptyStatePlaceholderOpensSettings() {
         launchApp(seed: .empty)
 

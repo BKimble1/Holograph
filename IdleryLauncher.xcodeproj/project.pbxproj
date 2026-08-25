@@ -49,6 +49,7 @@
 		C1577C455CE5074F4F67D354 /* HolographicCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F941721F4C0C65D1D75F11 /* HolographicCarousel.swift */; };
 		CBF6E78DAE6B438EDAD4BFDA /* SelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE4D539E4472CD1CCF6695C /* SelectionStore.swift */; };
 		CC4F4AAF76D8866E15093A9B /* LauncherLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30771B3C0AEFEEDABFDB38BE /* LauncherLayout.swift */; };
+		D5FF2C08ED8F7AE848FB05DF /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C374DFB3CF9E787A28F5B0 /* LoadingScreen.swift */; };
 		D8F9392B3ECB4DB06C96C1C6 /* IconProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87268F03176F3AC2364BCFAA /* IconProcessorTests.swift */; };
 		E14883B1FDDA7966EFA86A83 /* LauncherScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD78BB9037164E9804D89243 /* LauncherScreen.swift */; };
 		E16C95C25EE547F9F9F72584 /* AppLaunching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA11219121842237516EEFF /* AppLaunching.swift */; };
@@ -86,6 +87,7 @@
 		18F5836760810DEE997CD7B1 /* LauncherViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherViewModel.swift; sourceTree = "<group>"; };
 		1BD5D491219E2A9F4FAE8DD1 /* EmptyLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyLauncherView.swift; sourceTree = "<group>"; };
 		23D7344F3D91EADA5AB3914F /* PageIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIndicator.swift; sourceTree = "<group>"; };
+		24C374DFB3CF9E787A28F5B0 /* LoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreen.swift; sourceTree = "<group>"; };
 		25AFB14126C76DC577541FCA /* LaunchURLValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidatorTests.swift; sourceTree = "<group>"; };
 		2F1FD5905BD3B609CA20D839 /* PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSupport.swift; sourceTree = "<group>"; };
 		30771B3C0AEFEEDABFDB38BE /* LauncherLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherLayout.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 				30771B3C0AEFEEDABFDB38BE /* LauncherLayout.swift */,
 				BD78BB9037164E9804D89243 /* LauncherScreen.swift */,
 				18F5836760810DEE997CD7B1 /* LauncherViewModel.swift */,
+				24C374DFB3CF9E787A28F5B0 /* LoadingScreen.swift */,
 				23D7344F3D91EADA5AB3914F /* PageIndicator.swift */,
 			);
 			path = Launcher;
@@ -497,6 +500,7 @@
 				0E3D409EEE6987A5364F6651 /* LauncherRepository.swift in Sources */,
 				E14883B1FDDA7966EFA86A83 /* LauncherScreen.swift in Sources */,
 				ADB96949C3C161C7ECA489E8 /* LauncherViewModel.swift in Sources */,
+				D5FF2C08ED8F7AE848FB05DF /* LoadingScreen.swift in Sources */,
 				03D09908B6C579CBA94DFCA2 /* ModelContainerFactory.swift in Sources */,
 				50E0DE243315D1907EAD2F49 /* PageIndicator.swift in Sources */,
 				28447CCDB8FEA01A8B1A5C8D /* PortalLaunchOverlay.swift in Sources */,

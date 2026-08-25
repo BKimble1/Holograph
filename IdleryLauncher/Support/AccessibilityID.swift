@@ -5,6 +5,9 @@ import Foundation
 /// Keeping them in one place means a rename shows up as a compile error in the
 /// app target rather than a mysterious UI-test failure.
 enum AccessibilityID {
+    static let loadingScreen = "loading.screen"
+    static let poweredByIdlery = "loading.poweredByIdlery"
+
     static let carousel = "launcher.carousel"
     static let settingsButton = "launcher.settingsButton"
     static let selectedAppName = "launcher.selectedAppName"
