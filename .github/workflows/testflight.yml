@@ -332,6 +332,21 @@ jobs:
             --apiKey "${APP_STORE_CONNECT_KEY_ID}" \
             --apiIssuer "${APP_STORE_CONNECT_ISSUER_ID}"
 
+      # Acceptance is not availability: Apple processes the build afterwards,
+      # and that is what decides whether it reaches testers.
+      - name: Report TestFlight processing status
+        if: success()
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # A freshly accepted build takes a little while to appear at all.
+          sleep 60
+          ASC_KEY_PATH=~/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
+            python3 Scripts/asc_build_status.py com.idlery.holograph \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Explain a signing failure
         if: failure() && steps.signing.outputs.mode == 'cloud'
         run: |
