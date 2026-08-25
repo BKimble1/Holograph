@@ -147,7 +147,75 @@ jobs:
               counts = collections.Counter(
                   entry.get("attributes", {}).get(field) for entry in body.get("data", []))
               print("      %s" % (dict(counts) or "none"))
+
+          # Manual signing needs the profile's *name*, so resolve the one that
+          # matches this app rather than leaving it to be looked up by hand.
+          status, body = fetch(
+              "/v1/profiles?limit=200&include=bundleId"
+              "&fields[profiles]=name,profileType,profileState,expirationDate,bundleId"
+          )
+          print("--- App Store profiles for com.idlery.holograph: HTTP %s" % status)
+          if status == 200:
+              bundle_names = {
+                  entry["id"]: entry.get("attributes", {}).get("identifier")
+                  for entry in body.get("included", [])
+                  if entry.get("type") == "bundleIds"
+              }
+              matched = False
+              for entry in body.get("data", []):
+                  attributes = entry.get("attributes", {})
+                  related = (entry.get("relationships", {})
+                                  .get("bundleId", {})
+                                  .get("data") or {}).get("id")
+                  if bundle_names.get(related) != "com.idlery.holograph":
+                      continue
+                  matched = True
+                  print("      name=%r type=%s state=%s expires=%s" % (
+                      attributes.get("name"), attributes.get("profileType"),
+                      attributes.get("profileState"), attributes.get("expirationDate")))
+              if not matched:
+                  print("      none — no profile is attached to this bundle ID")
           PY
+
+      # Signing needs a certificate's *private key*, and a private key never
+      # leaves the Mac that created it — the App Store Connect API can list the
+      # team's certificates but cannot hand one over. So either the key is
+      # supplied here as a .p12, or Xcode's cloud signing mints its own, which
+      # needs an API key with the App Manager role.
+      - name: Set up distribution signing
+        id: signing
+        env:
+          APPLE_DISTRIBUTION_CERT_P12: ${{ secrets.APPLE_DISTRIBUTION_CERT_P12 }}
+          APPLE_DISTRIBUTION_CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_DISTRIBUTION_CERT_P12:-}" ]; then
+            echo "No APPLE_DISTRIBUTION_CERT_P12 secret — relying on cloud signing."
+            echo "mode=cloud" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          keychain="${RUNNER_TEMP}/holograph-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          # The .p12 is written, imported and deleted without being echoed.
+          printf '%s' "$APPLE_DISTRIBUTION_CERT_P12" | base64 --decode > "${RUNNER_TEMP}/dist.p12"
+          security import "${RUNNER_TEMP}/dist.p12" -k "$keychain" \
+            -P "${APPLE_DISTRIBUTION_CERT_PASSWORD:-}" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          rm -f "${RUNNER_TEMP}/dist.p12"
+
+          # Without this codesign prompts for keychain access and hangs.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          echo "Identities available after import:"
+          security find-identity -v -p codesigning "$keychain"
+          echo "mode=manual" >> "$GITHUB_OUTPUT"
 
       - name: Test gate on an iPad simulator
         if: ${{ inputs.skip_tests != true }}
@@ -264,9 +332,32 @@ jobs:
             --apiKey "${APP_STORE_CONNECT_KEY_ID}" \
             --apiIssuer "${APP_STORE_CONNECT_ISSUER_ID}"
 
+      - name: Explain a signing failure
+        if: failure() && steps.signing.outputs.mode == 'cloud'
+        run: |
+          cat <<'NOTE'
+          ::error::Distribution signing failed and no certificate was supplied.
+          Signing an App Store build needs a distribution certificate's private
+          key. Apple never releases one after it is created, so a hosted runner
+          has to be given it — or be allowed to create its own. Either:
+
+            1. Add secrets APPLE_DISTRIBUTION_CERT_P12 (base64 of an Apple
+               Distribution .p12 exported from Keychain Access) and
+               APPLE_DISTRIBUTION_CERT_PASSWORD. This workflow then imports it
+               and signs with it, and nothing else has to change.
+
+            2. Or replace APP_STORE_CONNECT_KEY_ID / APP_STORE_CONNECT_PRIVATE_KEY
+               with a key created under the App Manager role. Cloud signing then
+               creates and manages the certificate itself. The role is fixed when
+               a key is generated, so an existing Developer-role key cannot be
+               promoted.
+          NOTE
+
       - name: Remove the API key from the runner
         if: always()
-        run: rm -rf ~/private_keys
+        run: |
+          rm -rf ~/private_keys
+          security delete-keychain "${RUNNER_TEMP}/holograph-signing.keychain-db" 2>/dev/null || true
 
       - name: Upload the archive for inspection
         if: always()
