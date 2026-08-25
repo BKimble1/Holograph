@@ -130,10 +130,12 @@ jobs:
           PLIST
           plutil -lint /tmp/ExportOptions.plist
 
-      # Signed for distribution — see CODE_SIGN_IDENTITY on the app target's
-      # Release configuration. It has to live in the project rather than here:
-      # specifying an identity on the command line while the target signs
-      # automatically is rejected as a conflict.
+      # Archived unsigned, on purpose. `xcodebuild archive` with automatic
+      # signing always provisions for *development* and rejects any other
+      # identity as a manual conflict — and a development profile is built from
+      # registered device UDIDs, which a team shipping only through TestFlight
+      # has none of. Distribution signing belongs to -exportArchive, which
+      # re-signs the app with the App Store profile it provisions itself.
       - name: Archive
         run: |
           set -euo pipefail
@@ -152,7 +154,7 @@ jobs:
             -authenticationKeyID "${APP_STORE_CONNECT_KEY_ID}" \
             -authenticationKeyIssuerID "${APP_STORE_CONNECT_ISSUER_ID}" \
             DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=NO \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Report the signing identities available to the runner
