@@ -114,7 +114,8 @@ struct AppComposition {
 
         let motion = HoloMotion(
             isDisabledForTesting: environment.animationsDisabled,
-            holdsLoadingScreen: environment.holdsLoadingScreen
+            holdsLoadingScreen: environment.holdsLoadingScreen,
+            freezesLoadingScreen: environment.freezesLoadingScreen
         )
 
         let model = LauncherViewModel(

@@ -23,8 +23,12 @@ class LauncherUITestCase: XCTestCase {
         /// loading screen shortened, so the suite is not paced by animation.
         case shortened
         /// Full-length motion, with the loading screen held open long enough to
-        /// be asserted on and photographed.
+        /// be asserted on before it hands over on its own.
         case holdIntro
+        /// The loading screen stays put. For photographing it: launch and an
+        /// orientation change can already outrun a timed hold on a slow runner,
+        /// and a screenshot should not be a race.
+        case frozenIntro
     }
 
     var app: XCUIApplication!
@@ -48,6 +52,8 @@ class LauncherUITestCase: XCTestCase {
             arguments.append("-disableAnimations")
         case .holdIntro:
             arguments.append("-holdLoadingScreen")
+        case .frozenIntro:
+            arguments.append("-freezeLoadingScreen")
         }
         application.launchArguments = arguments
         application.launch()

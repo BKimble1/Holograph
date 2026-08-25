@@ -35,6 +35,7 @@ struct LaunchEnvironment: Sendable, Equatable {
     /// and assert on it. `XCUIApplication.launch()` waits for the app to settle,
     /// which can already outlast the normal intro.
     var holdsLoadingScreen = false
+    var freezesLoadingScreen = false
 
     enum Argument {
         static let uiTesting = "-uiTesting"
@@ -45,6 +46,7 @@ struct LaunchEnvironment: Sendable, Equatable {
         static let mockLaunchSuccess = "-mockLaunchSuccess"
         static let mockLaunchFailure = "-mockLaunchFailure"
         static let holdLoadingScreen = "-holdLoadingScreen"
+        static let freezeLoadingScreen = "-freezeLoadingScreen"
     }
 
     static func make(from arguments: [String]) -> LaunchEnvironment {
@@ -59,6 +61,7 @@ struct LaunchEnvironment: Sendable, Equatable {
         if flags.contains(Argument.mockLaunchSuccess) { environment.launcher = .stubbedSuccess }
         if flags.contains(Argument.mockLaunchFailure) { environment.launcher = .stubbedFailure }
         if flags.contains(Argument.holdLoadingScreen) { environment.holdsLoadingScreen = true }
+        if flags.contains(Argument.freezeLoadingScreen) { environment.freezesLoadingScreen = true }
 
         return environment
     }

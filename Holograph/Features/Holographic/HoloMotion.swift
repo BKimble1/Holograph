@@ -17,8 +17,15 @@ final class HoloMotion {
     var isDisabledForTesting = false
     /// Set by `-holdLoadingScreen` so a test can assert on the intro.
     var holdsLoadingScreen = false
+    /// Keeps the intro up indefinitely, for the one test that photographs it.
+    var freezesLoadingScreen = false
 
-    init(isDisabledForTesting: Bool = false, holdsLoadingScreen: Bool = false) {
+    init(
+        isDisabledForTesting: Bool = false,
+        holdsLoadingScreen: Bool = false,
+        freezesLoadingScreen: Bool = false
+    ) {
+        self.freezesLoadingScreen = freezesLoadingScreen
         self.isDisabledForTesting = isDisabledForTesting
         self.holdsLoadingScreen = holdsLoadingScreen
     }
@@ -45,6 +52,9 @@ final class HoloMotion {
     /// How long the loading screen holds before the launcher takes over. Short
     /// under test so the suite is not paced by an animation.
     var introDuration: Duration {
+        // Photographing the intro should not be a race against a timer that
+        // launch and an orientation change can already outrun on a slow runner.
+        if freezesLoadingScreen { return .seconds(60 * 60) }
         if holdsLoadingScreen { return .seconds(8) }
         if isDisabledForTesting { return .milliseconds(600) }
         if prefersReducedMotion { return .milliseconds(900) }
