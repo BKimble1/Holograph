@@ -302,3 +302,15 @@ enum AppInfo {
         return "\(short) (\(build))"
     }
 }
+
+#Preview("Settings — populated") {
+    SheetPreviewHost { _ in
+        SettingsSheet(initialRoute: nil)
+    }
+}
+
+#Preview("Settings — nothing added yet") {
+    SheetPreviewHost(items: []) { _ in
+        SettingsSheet(initialRoute: nil)
+    }
+}

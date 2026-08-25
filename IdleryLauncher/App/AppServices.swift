@@ -54,8 +54,20 @@ struct AppComposition {
     let pendingSeed: LaunchEnvironment.SeedKind
 
     static func make(environment: LaunchEnvironment) -> AppComposition {
-        let containerResult = ModelContainerFactory.make(inMemory: environment.store == .inMemory)
-        let repository = SwiftDataLauncherRepository(context: containerResult.container.mainContext)
+        let wantsMemoryStore = environment.store == .inMemory
+        let repository: LauncherRepository
+        let storageDegraded: Bool
+
+        switch ModelContainerFactory.make(inMemory: wantsMemoryStore) {
+        case .ready(let container):
+            repository = SwiftDataLauncherRepository(context: container.mainContext)
+            storageDegraded = false
+        case .unavailable:
+            // Nothing will persist, but the launcher still opens and works for
+            // this session — and says so.
+            repository = InMemoryLauncherRepository()
+            storageDegraded = !wantsMemoryStore
+        }
 
         let launcher: AppLaunching
         switch environment.launcher {
@@ -93,7 +105,7 @@ struct AppComposition {
             services: services,
             motion: motion,
             model: model,
-            didFallBackToMemory: containerResult.didFallBackToMemory,
+            didFallBackToMemory: storageDegraded,
             pendingSeed: environment.seed
         )
     }

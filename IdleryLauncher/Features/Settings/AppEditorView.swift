@@ -293,3 +293,22 @@ private struct LabeledField<Content: View>: View {
         .padding(.vertical, 2)
     }
 }
+
+#Preview("Add an app") {
+    SheetPreviewHost { harness in
+        NavigationStack {
+            AppEditorView(target: .add, services: harness.services)
+        }
+    }
+}
+
+#Preview("Edit an app") {
+    SheetPreviewHost { harness in
+        NavigationStack {
+            AppEditorView(
+                target: .edit(harness.model.items.first ?? LauncherItem.previewItems()[0]),
+                services: harness.services
+            )
+        }
+    }
+}

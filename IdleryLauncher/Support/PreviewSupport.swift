@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Builds a fully wired launcher backed by an in-memory store.
+/// A fully wired launcher backed by an in-memory store, for the SwiftUI
+/// previews in this target.
 ///
-/// Used by the SwiftUI previews in this target. It is intentionally not
-/// compiled out of release builds: `#Preview` bodies are, and keeping the host
-/// alongside them avoids a configuration-dependent build break for the sake of
-/// a few hundred bytes.
+/// Intentionally not compiled out of release builds: `#Preview` bodies are, and
+/// keeping the harness beside them avoids a configuration-dependent build break
+/// for the sake of a few hundred bytes.
 @MainActor
-struct LauncherPreviewHost: View {
-    @State private var model: LauncherViewModel
-    @State private var motion: HoloMotion
-    @State private var services: AppServices
+final class PreviewHarness {
+    let model: LauncherViewModel
+    let motion: HoloMotion
+    let services: AppServices
 
     init(items: [LauncherItem] = LauncherItem.previewItems(), launchSucceeds: Bool = true) {
         let repository = InMemoryLauncherRepository(items: items)
@@ -28,24 +28,82 @@ struct LauncherPreviewHost: View {
         )
         model.load()
 
-        _model = State(initialValue: model)
-        _motion = State(initialValue: motion)
-        _services = State(
-            initialValue: AppServices(
-                repository: repository,
-                launcher: launcher,
-                feedback: feedback,
-                selectionStore: selectionStore,
-                metadataProvider: PreviewMetadataProvider()
-            )
+        self.model = model
+        self.motion = motion
+        self.services = AppServices(
+            repository: repository,
+            launcher: launcher,
+            feedback: feedback,
+            selectionStore: selectionStore,
+            metadataProvider: PreviewMetadataProvider()
         )
+    }
+}
+
+/// Wraps any preview content in the harness's environment.
+@MainActor
+struct PreviewHost<Content: View>: View {
+    @State private var harness: PreviewHarness
+    private let content: (PreviewHarness) -> Content
+
+    init(
+        items: [LauncherItem] = LauncherItem.previewItems(),
+        launchSucceeds: Bool = true,
+        @ViewBuilder content: @escaping (PreviewHarness) -> Content
+    ) {
+        _harness = State(initialValue: PreviewHarness(items: items, launchSucceeds: launchSucceeds))
+        self.content = content
     }
 
     var body: some View {
-        LauncherScreen()
-            .environment(model)
-            .environment(motion)
-            .environment(services)
+        content(harness)
+            .environment(harness.model)
+            .environment(harness.motion)
+            .environment(harness.services)
+    }
+}
+
+/// The launcher itself.
+@MainActor
+struct LauncherPreviewHost: View {
+    var items: [LauncherItem] = LauncherItem.previewItems()
+    var launchSucceeds = true
+
+    var body: some View {
+        PreviewHost(items: items, launchSucceeds: launchSucceeds) { _ in
+            LauncherScreen()
+        }
+    }
+}
+
+/// The launcher with a sheet already presented over it, so sheet-only modifiers
+/// such as `presentationBackground` behave as they do in the app.
+@MainActor
+struct SheetPreviewHost<Sheet: View>: View {
+    @State private var isPresented = true
+    private let items: [LauncherItem]
+    private let sheet: (PreviewHarness) -> Sheet
+
+    init(
+        items: [LauncherItem] = LauncherItem.previewItems(),
+        @ViewBuilder sheet: @escaping (PreviewHarness) -> Sheet
+    ) {
+        self.items = items
+        self.sheet = sheet
+    }
+
+    var body: some View {
+        PreviewHost(items: items) { harness in
+            ZStack {
+                HoloBackgroundView()
+            }
+            .sheet(isPresented: $isPresented) {
+                sheet(harness)
+                    .environment(harness.model)
+                    .environment(harness.motion)
+                    .environment(harness.services)
+            }
+        }
     }
 }
 
@@ -58,8 +116,4 @@ struct PreviewMetadataProvider: AppStoreMetadataProviding {
     func artworkData(at url: URL) async throws -> Data {
         throw AppStoreLookupError.artworkUnavailable
     }
-}
-
-#Preview("Settings") {
-    LauncherPreviewHost()
 }
