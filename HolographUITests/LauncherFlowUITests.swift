@@ -150,13 +150,14 @@ final class LauncherFlowUITests: LauncherUITestCase {
 
         revealInSettings("settings.restoreDemoApps").tap()
 
-        // Restoring inserts five rows at the *top* of a list we have just
-        // scrolled down, and rows off screen are not in the accessibility tree,
-        // so come back up to them before looking.
-        let restored = revealAboveInSettings("settings.row.Tagfield")
+        // Asserted on the carousel rather than the settings list. The list has
+        // been scrolled down to reach the button and the restored rows arrive
+        // above it, where SwiftUI does not keep them in the accessibility tree —
+        // whereas the launcher behind the sheet repopulates immediately, which
+        // is the thing this test is named for.
         XCTAssertTrue(
-            restored.waitForExistence(timeout: 20),
-            "Restoring should repopulate the list. On screen:\n\(visibleElementSummary())"
+            carouselItem("Tagfield").waitForExistence(timeout: 20),
+            "Restoring should repopulate the launcher. On screen:\n\(visibleElementSummary())"
         )
         closeSettings()
         XCTAssertTrue(selectedAppName.waitForExistence(timeout: 20))
