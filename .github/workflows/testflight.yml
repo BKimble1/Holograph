@@ -130,6 +130,10 @@ jobs:
           PLIST
           plutil -lint /tmp/ExportOptions.plist
 
+      # The archive must be signed for distribution. Left at the SDK default
+      # the identity is "Apple Development", and automatic provisioning then
+      # tries to mint a *development* profile — which needs registered device
+      # UDIDs and fails on a team that has none.
       - name: Archive
         run: |
           set -euo pipefail
@@ -149,7 +153,16 @@ jobs:
             -authenticationKeyIssuerID "${APP_STORE_CONNECT_ISSUER_ID}" \
             DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
             CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Report the signing identities available to the runner
+        if: failure()
+        run: |
+          # Names only — no key material. Useful when automatic provisioning
+          # cannot resolve a distribution identity.
+          echo "Signing identities visible to this runner:"
+          security find-identity -v -p codesigning || true
 
       - name: Export the IPA
         run: |
