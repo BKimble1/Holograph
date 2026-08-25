@@ -5,7 +5,12 @@ import SwiftData
 /// Builds the SwiftData stack, degrading gracefully rather than refusing to
 /// launch if the on-disk store is unreadable.
 enum ModelContainerFactory {
-    static var schema: Schema { Schema([StoredLauncherApp.self]) }
+    /// The models this app persists. Callers that need a `Schema` build one
+    /// with `makeSchema()` — and must use that single instance throughout, see
+    /// `container(inMemory:)`.
+    static let models: [any PersistentModel.Type] = [StoredLauncherApp.self]
+
+    static func makeSchema() -> Schema { Schema(models) }
 
     private static var logger: Logger { Logger(subsystem: "com.idlery.holograph", category: "persistence") }
 
@@ -30,6 +35,11 @@ enum ModelContainerFactory {
 
     private static func container(inMemory: Bool) -> ModelContainer? {
         do {
+            // One schema object, shared by the configuration and the
+            // container. Handing each its own instance leaves the container
+            // describing the same models through two different objects, and
+            // SwiftData traps the first time anything is fetched.
+            let schema = makeSchema()
             let configuration: ModelConfiguration
             if inMemory {
                 configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)

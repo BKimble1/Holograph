@@ -189,11 +189,7 @@ jobs:
           fi
 
           echo "--- crash reports in the last 15 minutes ---"
-          find ~/Library/Logs/DiagnosticReports -name '*.ips' -mmin -15 2>/dev/null | while read -r report; do
-            echo "===== $report ====="
-            head -c 6000 "$report"
-            echo
-          done
+          python3 Scripts/dump_crash_reports.py 15 || true
           exit 0
 
       - name: Run unit tests
@@ -251,16 +247,7 @@ jobs:
           done
 
           echo "--- simulator crash reports from this run ---"
-          reports="$(find ~/Library/Logs/DiagnosticReports -name '*.ips' -mmin -45 2>/dev/null | head -6)"
-          if [ -z "$reports" ]; then
-            echo "(none found)"
-          fi
-          for report in $reports; do
-            echo "===== $report ====="
-            # The first JSON line is the summary; the body names the faulting frame.
-            head -c 8000 "$report"
-            echo
-          done
+          python3 Scripts/dump_crash_reports.py 45 || true
           exit 0
 
       - name: Export screenshots from the UI test results
@@ -291,18 +278,30 @@ jobs:
               print("no manifest.json; nothing to rename")
               raise SystemExit(0)
           # Only this project's own captures, which are all numbered "NN-name".
-          wanted = re.compile(r"^\d{2}-[a-z0-9-]+$")
+          wanted = re.compile(r"\d{2}-[a-z0-9-]+")
           count = 0
-          for test in json.loads(manifest.read_text()):
+          entries = json.loads(manifest.read_text())
+          print("manifest keys:", sorted({k for e in entries for k in e}))
+          for test in entries:
               for attachment in test.get("attachments", []):
                   exported = attachment.get("exportedFileName")
-                  suggested = attachment.get("suggestedHumanReadableName") or exported or ""
-                  stem = pathlib.Path(suggested).stem
-                  if not exported or not wanted.match(stem):
+                  if not exported:
+                      continue
+                  # xcresulttool has used more than one key for the name over
+                  # the years; try each, then the exported filename itself.
+                  for candidate in (
+                      attachment.get("suggestedHumanReadableName") or "",
+                      attachment.get("name") or "",
+                      exported,
+                  ):
+                      match = wanted.search(candidate)
+                      if match:
+                          break
+                  if not match:
                       continue
                   source = root / exported
                   if source.exists():
-                      shutil.copy(source, keep / f"{stem}.png")
+                      shutil.copy(source, keep / f"{match.group(0)}.png")
                       count += 1
           print(f"kept {count} project screenshots")
           # XCTest's own recordings have quotes in their names, which artifact

@@ -95,15 +95,12 @@ final class SwiftDataLauncherRepository: LauncherRepository {
 
     // MARK: - Plumbing
 
+    /// Ordering happens in Swift rather than in the fetch. A launcher holds a
+    /// handful of apps, so there is nothing to gain from sorting in the store.
     private func storedApps() throws -> [StoredLauncherApp] {
-        let descriptor = FetchDescriptor<StoredLauncherApp>(
-            sortBy: [
-                SortDescriptor(\StoredLauncherApp.sortOrder, order: .forward),
-                SortDescriptor(\StoredLauncherApp.createdAt, order: .forward)
-            ]
-        )
         do {
-            return try context.fetch(descriptor)
+            let all = try context.fetch(FetchDescriptor<StoredLauncherApp>())
+            return all.sorted { ($0.sortOrder, $0.createdAt) < ($1.sortOrder, $1.createdAt) }
         } catch {
             throw LauncherRepositoryError.storeUnavailable(error.localizedDescription)
         }
