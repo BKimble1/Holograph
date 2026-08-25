@@ -188,6 +188,58 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             | tee ui-tests.log
 
+      - name: Export screenshots from the UI test results
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p screenshots
+          if [ ! -d UITests.xcresult ]; then
+            echo "No UI test result bundle to export from."
+            exit 0
+          fi
+          if xcrun xcresulttool export attachments \
+               --path UITests.xcresult \
+               --output-path screenshots >/dev/null 2>&1; then
+            echo "Exported attachments with xcresulttool."
+          else
+            echo "::warning::xcresulttool could not export attachments on this Xcode."
+          fi
+          # xcresulttool writes a manifest plus opaque filenames; give the images
+          # their attachment names so they are readable in the artifact.
+          python3 - <<'PY'
+          import json, pathlib, shutil
+          root = pathlib.Path("screenshots")
+          manifest = root / "manifest.json"
+          if not manifest.exists():
+              print("no manifest.json; leaving exported files as they are")
+              raise SystemExit(0)
+          entries = json.loads(manifest.read_text())
+          count = 0
+          for test in entries:
+              for attachment in test.get("attachments", []):
+                  exported = attachment.get("exportedFileName")
+                  suggested = attachment.get("suggestedHumanReadableName") or exported
+                  if not exported:
+                      continue
+                  source = root / exported
+                  if not source.exists():
+                      continue
+                  name = pathlib.Path(suggested).stem
+                  shutil.copy(source, root / f"{name}.png")
+                  count += 1
+          print(f"named {count} attachments")
+          PY
+          ls -la screenshots || true
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Upload logs and result bundles
         if: always()
         uses: actions/upload-artifact@v4

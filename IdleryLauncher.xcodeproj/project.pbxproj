@@ -13,6 +13,7 @@
 		0FF361136B2FA4D8677B7AE9 /* LauncherRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38AB1FD698D6D3DC96B8BED /* LauncherRepositoryTests.swift */; };
 		1202D9C88B1F72EE2CD1148E /* AppEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C44BD901605B67518DB7F54 /* AppEditorView.swift */; };
 		15615443F7CA05B86789086F /* LaunchURLValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A52F724DC66B53021949CFB /* LaunchURLValidator.swift */; };
+		1E768CE77F32834587C2BB97 /* AppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9052C5174026773AC177CB9C /* AppearanceUITests.swift */; };
 		26BBCAEB3036A58859F6BB43 /* DemoIconArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC11314908923696C6173E65 /* DemoIconArtwork.swift */; };
 		28447CCDB8FEA01A8B1A5C8D /* PortalLaunchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31B5020C7E020D58E40C7E /* PortalLaunchOverlay.swift */; };
 		2CEB01A1C2CE3ADE4C55AE4F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D3C1ED8A1430573273EE1344 /* Assets.xcassets */; };
@@ -107,6 +108,7 @@
 		8A3D1D552712E12F81E1CBBF /* IdleryLauncherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IdleryLauncherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B5137301706B36690A7CF04 /* IconArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconArtworkView.swift; sourceTree = "<group>"; };
 		8BD68DBD0828A7A639E165B1 /* HolographicIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographicIconView.swift; sourceTree = "<group>"; };
+		9052C5174026773AC177CB9C /* AppearanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceUITests.swift; sourceTree = "<group>"; };
 		92879E10994E6FFFF05C7335 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
 		98F941721F4C0C65D1D75F11 /* HolographicCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographicCarousel.swift; sourceTree = "<group>"; };
 		A04B86DA4F4404DD3BA4DBD2 /* LauncherUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherUITestCase.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 		A110245082970F21CCA0FAB6 /* IdleryLauncherUITests */ = {
 			isa = PBXGroup;
 			children = (
+				9052C5174026773AC177CB9C /* AppearanceUITests.swift */,
 				70695AE4C2FB3019E09579C3 /* CarouselUITests.swift */,
 				4525081719B4A604DC61F132 /* LauncherFlowUITests.swift */,
 				A04B86DA4F4404DD3BA4DBD2 /* LauncherUITestCase.swift */,
@@ -527,6 +530,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1E768CE77F32834587C2BB97 /* AppearanceUITests.swift in Sources */,
 				437A02C33B65C24E494FD203 /* CarouselUITests.swift in Sources */,
 				A11D517540A178BF6BA0731C /* LauncherFlowUITests.swift in Sources */,
 				835CF9DB1477F920CFA64FE4 /* LauncherUITestCase.swift in Sources */,
