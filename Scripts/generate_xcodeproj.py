@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate IdleryLauncher.xcodeproj deterministically from the source tree.
+"""Generate Holograph.xcodeproj deterministically from the source tree.
 
 The project file is committed, so a contributor only needs Xcode. Re-run this
 after adding or removing source files:
@@ -17,19 +17,19 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PROJECT_NAME = "IdleryLauncher"
-APP_TARGET = "IdleryLauncher"
-UNIT_TARGET = "IdleryLauncherTests"
-UI_TARGET = "IdleryLauncherUITests"
-BUNDLE_ID = "com.idlery.launcher"
+PROJECT_NAME = "Holograph"
+APP_TARGET = "Holograph"
+UNIT_TARGET = "HolographTests"
+UI_TARGET = "HolographUITests"
+BUNDLE_ID = "com.idlery.holograph"
 DEPLOYMENT_TARGET = "17.0"
 SWIFT_VERSION = "6.0"
 XCODE_OBJECT_VERSION = "56"
 
 SOURCE_ROOTS = {
-    APP_TARGET: "IdleryLauncher",
-    UNIT_TARGET: "IdleryLauncherTests",
-    UI_TARGET: "IdleryLauncherUITests",
+    APP_TARGET: "Holograph",
+    UNIT_TARGET: "HolographTests",
+    UI_TARGET: "HolographUITests",
 }
 
 # Directories treated as opaque bundles rather than walked into.
@@ -503,7 +503,7 @@ def build_configurations(target_uids: dict[str, str]) -> dict[str, dict[str, dic
         "CURRENT_PROJECT_VERSION": "1",
         "ENABLE_PREVIEWS": "YES",
         "GENERATE_INFOPLIST_FILE": "NO",
-        "INFOPLIST_FILE": "IdleryLauncher/Info.plist",
+        "INFOPLIST_FILE": "Holograph/Info.plist",
         "LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/Frameworks"],
         "MARKETING_VERSION": "1.0",
         "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID,
@@ -518,6 +518,11 @@ def build_configurations(target_uids: dict[str, str]) -> dict[str, dict[str, dic
 
     unit_common = {
         "BUNDLE_LOADER": "$(TEST_HOST)",
+        "LD_RUNPATH_SEARCH_PATHS": [
+            "$(inherited)",
+            "@executable_path/Frameworks",
+            "@loader_path/Frameworks",
+        ],
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
         "GENERATE_INFOPLIST_FILE": "YES",
@@ -531,6 +536,11 @@ def build_configurations(target_uids: dict[str, str]) -> dict[str, dict[str, dic
 
     ui_common = {
         "CODE_SIGN_STYLE": "Automatic",
+        "LD_RUNPATH_SEARCH_PATHS": [
+            "$(inherited)",
+            "@executable_path/Frameworks",
+            "@loader_path/Frameworks",
+        ],
         "CURRENT_PROJECT_VERSION": "1",
         "GENERATE_INFOPLIST_FILE": "YES",
         "MARKETING_VERSION": "1.0",
@@ -566,9 +576,9 @@ SCHEME = """<?xml version="1.0" encoding="UTF-8"?>
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "{app_uid}"
-               BuildableName = "IdleryLauncher.app"
-               BlueprintName = "IdleryLauncher"
-               ReferencedContainer = "container:IdleryLauncher.xcodeproj">
+               BuildableName = "Holograph.app"
+               BlueprintName = "Holograph"
+               ReferencedContainer = "container:Holograph.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -584,9 +594,9 @@ SCHEME = """<?xml version="1.0" encoding="UTF-8"?>
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "{unit_uid}"
-               BuildableName = "IdleryLauncherTests.xctest"
-               BlueprintName = "IdleryLauncherTests"
-               ReferencedContainer = "container:IdleryLauncher.xcodeproj">
+               BuildableName = "HolographTests.xctest"
+               BlueprintName = "HolographTests"
+               ReferencedContainer = "container:Holograph.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -594,9 +604,9 @@ SCHEME = """<?xml version="1.0" encoding="UTF-8"?>
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "{ui_uid}"
-               BuildableName = "IdleryLauncherUITests.xctest"
-               BlueprintName = "IdleryLauncherUITests"
-               ReferencedContainer = "container:IdleryLauncher.xcodeproj">
+               BuildableName = "HolographUITests.xctest"
+               BlueprintName = "HolographUITests"
+               ReferencedContainer = "container:Holograph.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -616,9 +626,9 @@ SCHEME = """<?xml version="1.0" encoding="UTF-8"?>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "{app_uid}"
-            BuildableName = "IdleryLauncher.app"
-            BlueprintName = "IdleryLauncher"
-            ReferencedContainer = "container:IdleryLauncher.xcodeproj">
+            BuildableName = "Holograph.app"
+            BlueprintName = "Holograph"
+            ReferencedContainer = "container:Holograph.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -633,9 +643,9 @@ SCHEME = """<?xml version="1.0" encoding="UTF-8"?>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "{app_uid}"
-            BuildableName = "IdleryLauncher.app"
-            BlueprintName = "IdleryLauncher"
-            ReferencedContainer = "container:IdleryLauncher.xcodeproj">
+            BuildableName = "Holograph.app"
+            BlueprintName = "Holograph"
+            ReferencedContainer = "container:Holograph.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

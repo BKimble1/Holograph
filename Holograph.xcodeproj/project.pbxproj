@@ -1,0 +1,851 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0888778AE4AC523479E82C0E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A06365E98CE4387A5697824 /* Assets.xcassets */; };
+		0EBCF848064C6917F8E44750 /* DemoContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9795AB2394722BC0A465035C /* DemoContentTests.swift */; };
+		0F2C5B1B7CEB89591D8F6721 /* CarouselGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */; };
+		0FFCF3D438E872A9C282A35C /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9DA080B4D789F02B83DEF8 /* AppServices.swift */; };
+		13277315FA1595FAD68DB32C /* AppStoreLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */; };
+		19A2718C7151CA2EA73485E4 /* EmptyLauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03956C5671B68FDCFE69DFCF /* EmptyLauncherView.swift */; };
+		23C8620555949AA228D6F7EF /* AppEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */; };
+		26F1D6B8A66FB9A55B655AAD /* AccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F539C57FB878DB5F796B17 /* AccessibilityID.swift */; };
+		2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA647AD3FF45893A0F91BF3 /* StoredLauncherApp.swift */; };
+		2BE29D5DACEA3A8882C2C4A8 /* LauncherRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */; };
+		307CBA5ED99317F1710FC881 /* SelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A484FD65121E780E48A76D30 /* SelectionStore.swift */; };
+		3C9E61D37DF27C87E7936EC6 /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21F2EDCED1B1AD8048733D8 /* PreviewSupport.swift */; };
+		3E6231D2FB8ABF17E4BAAA33 /* LoadingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19529D587E01BB8D5DF09DE /* LoadingScreen.swift */; };
+		3E669F2AEF16356E0D794700 /* LauncherUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF7ECF074794B8A13B19D7F /* LauncherUITestCase.swift */; };
+		3EED5D27BC217F6E21FEA78F /* HoloTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3DC9D2858A257624060AB1 /* HoloTheme.swift */; };
+		4CC03438C803E6DD3D103100 /* PortalLaunchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */; };
+		4D44A4FB9FF0677BC1538FC6 /* IconProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */; };
+		51F818343A8C821F3404AE5F /* IconArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */; };
+		61038835CF496632377F4205 /* LaunchEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */; };
+		633D42495B20B1AB39DE78FA /* PageIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5652E29C8518F769C113B7 /* PageIndicator.swift */; };
+		68B7BFCF7EB568ADB06007CA /* AppLaunching.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5059B443A7FC5D456320C66 /* AppLaunching.swift */; };
+		68D9D1BD274747F2F5BBFA30 /* HolographApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341D02C7FA64F8F23F23639E /* HolographApp.swift */; };
+		6CF5C3AD16DF011A142E4538 /* DemoIconArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8085B5096507AF585918BA8D /* DemoIconArtwork.swift */; };
+		6D64F849267A6B00A198061E /* HoloBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505B37E8AD6BBE7D77F87D5C /* HoloBackgroundView.swift */; };
+		709A1FFC51D6DB603AA7853F /* LauncherFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 014244B3CB9D330A6873DD37 /* LauncherFlowUITests.swift */; };
+		7292FD8356B1C5D5B382BB4F /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */; };
+		74D4C75B205DC9F06832898C /* LauncherItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38646CD3BC3EABD5F6B43584 /* LauncherItem.swift */; };
+		7F7EAF8B848406BEDC90A81B /* StubAppLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */; };
+		807497263DE17FA364CE9B42 /* DemoContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239FAC8B9251AA6EC0139A7E /* DemoContent.swift */; };
+		8CF1F164E4189DE9A2612FBD /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E766AEDBAF4C1E1D67FD5C1C /* ModelContainerFactory.swift */; };
+		9477E227CF3AF0E556BD8DD1 /* LaunchURLValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */; };
+		9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */; };
+		A0651CF85CBA7439BCF5F6C3 /* IconProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */; };
+		A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */; };
+		A8D1B7B0DEBEE97EB1D50CD8 /* AppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */; };
+		AB4F2869662119214BE296E9 /* LauncherLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */; };
+		B19DE4E04AD9BD7444632B19 /* HolographicCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */; };
+		B1E567A98B64D4E71DF91452 /* LaunchURLValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */; };
+		BCC037B1A5D8F1F597479453 /* InMemoryLauncherRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6038523860A1A525D191193E /* InMemoryLauncherRepository.swift */; };
+		C3BA99E29F48DE0AE2EF3CDE /* LauncherRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080C0D0BBA8060A48D93ABAE /* LauncherRepository.swift */; };
+		C74D38AD278D6045AE68EE5B /* LauncherViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6935094BC5FDE86B2EC945 /* LauncherViewModel.swift */; };
+		CEF809E33AA46267F977EFD0 /* HolographicIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6A554428741222E1945ABB /* HolographicIconView.swift */; };
+		D1B4449D8C19CD4AF7BAE369 /* AppStoreLookupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */; };
+		DA5F699FCEB6156D363D69DF /* LauncherScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAD34C8E4FECEB823E33A42 /* LauncherScreen.swift */; };
+		DC40FF39DDC1A617DA982E7C /* HoloMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C099C1ABD945FB3849DC003 /* HoloMotion.swift */; };
+		DCB8F952E7AC0137E5F5E43B /* SwiftDataLauncherRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */; };
+		E435AB063BC77B62705EEE41 /* CarouselUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CE3D119D328B3553DE84B8 /* CarouselUITests.swift */; };
+		E6230B7725CBF181FC4B229B /* LauncherViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */; };
+		F2F44FD4ABD035FB4C718FD8 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */; };
+		F408FF5CD75F691AB46D1FAC /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */; };
+		FC3E4452EEEDAA3F654047A1 /* AppEditorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */; };
+		FD2B52B5B6D148E77DFA32A1 /* AppEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BC3758110F199D17D303E045 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2FD30797D805A4AE381BBF4A;
+			remoteInfo = Holograph;
+		};
+		129D349CF4E99FB087FCFF2D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2FD30797D805A4AE381BBF4A;
+			remoteInfo = Holograph;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		014244B3CB9D330A6873DD37 /* LauncherFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherFlowUITests.swift; sourceTree = "<group>"; };
+		01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherViewModelTests.swift; sourceTree = "<group>"; };
+		03956C5671B68FDCFE69DFCF /* EmptyLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyLauncherView.swift; sourceTree = "<group>"; };
+		080C0D0BBA8060A48D93ABAE /* LauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherRepository.swift; sourceTree = "<group>"; };
+		08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLauncherRepository.swift; sourceTree = "<group>"; };
+		0A06365E98CE4387A5697824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubAppLauncher.swift; sourceTree = "<group>"; };
+		1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		1A9DA080B4D789F02B83DEF8 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
+		1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreLookupTests.swift; sourceTree = "<group>"; };
+		1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreLookupService.swift; sourceTree = "<group>"; };
+		1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconArtworkView.swift; sourceTree = "<group>"; };
+		1EF7ECF074794B8A13B19D7F /* LauncherUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherUITestCase.swift; sourceTree = "<group>"; };
+		239FAC8B9251AA6EC0139A7E /* DemoContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContent.swift; sourceTree = "<group>"; };
+		2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidator.swift; sourceTree = "<group>"; };
+		2D39B4CBEC0FE2103BC9A6FE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceUITests.swift; sourceTree = "<group>"; };
+		341D02C7FA64F8F23F23639E /* HolographApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographApp.swift; sourceTree = "<group>"; };
+		38646CD3BC3EABD5F6B43584 /* LauncherItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherItem.swift; sourceTree = "<group>"; };
+		3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographicCarousel.swift; sourceTree = "<group>"; };
+		4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidatorTests.swift; sourceTree = "<group>"; };
+		505B37E8AD6BBE7D77F87D5C /* HoloBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBackgroundView.swift; sourceTree = "<group>"; };
+		507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherRepositoryTests.swift; sourceTree = "<group>"; };
+		6038523860A1A525D191193E /* InMemoryLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryLauncherRepository.swift; sourceTree = "<group>"; };
+		74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortalLaunchOverlay.swift; sourceTree = "<group>"; };
+		77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconProcessorTests.swift; sourceTree = "<group>"; };
+		77F539C57FB878DB5F796B17 /* AccessibilityID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityID.swift; sourceTree = "<group>"; };
+		784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreURLParser.swift; sourceTree = "<group>"; };
+		7A6935094BC5FDE86B2EC945 /* LauncherViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherViewModel.swift; sourceTree = "<group>"; };
+		7A6A554428741222E1945ABB /* HolographicIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographicIconView.swift; sourceTree = "<group>"; };
+		8085B5096507AF585918BA8D /* DemoIconArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoIconArtwork.swift; sourceTree = "<group>"; };
+		80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorViewModel.swift; sourceTree = "<group>"; };
+		84337AD8D27FCD69AF2C4FC2 /* Holograph.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Holograph.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreURLParserTests.swift; sourceTree = "<group>"; };
+		8A3D1D552712E12F81E1CBBF /* HolographUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HolographUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9795AB2394722BC0A465035C /* DemoContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContentTests.swift; sourceTree = "<group>"; };
+		9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchEnvironment.swift; sourceTree = "<group>"; };
+		9C099C1ABD945FB3849DC003 /* HoloMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloMotion.swift; sourceTree = "<group>"; };
+		A484FD65121E780E48A76D30 /* SelectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionStore.swift; sourceTree = "<group>"; };
+		AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherLayout.swift; sourceTree = "<group>"; };
+		B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorViewModelTests.swift; sourceTree = "<group>"; };
+		B19529D587E01BB8D5DF09DE /* LoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreen.swift; sourceTree = "<group>"; };
+		BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselGeometryTests.swift; sourceTree = "<group>"; };
+		BC12E2F5145D224457882A85 /* HolographTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HolographTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDAD34C8E4FECEB823E33A42 /* LauncherScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherScreen.swift; sourceTree = "<group>"; };
+		C5059B443A7FC5D456320C66 /* AppLaunching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunching.swift; sourceTree = "<group>"; };
+		DB5652E29C8518F769C113B7 /* PageIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIndicator.swift; sourceTree = "<group>"; };
+		E21F2EDCED1B1AD8048733D8 /* PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSupport.swift; sourceTree = "<group>"; };
+		E766AEDBAF4C1E1D67FD5C1C /* ModelContainerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerFactory.swift; sourceTree = "<group>"; };
+		EDA647AD3FF45893A0F91BF3 /* StoredLauncherApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoredLauncherApp.swift; sourceTree = "<group>"; };
+		F0CE3D119D328B3553DE84B8 /* CarouselUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselUITests.swift; sourceTree = "<group>"; };
+		F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconProcessor.swift; sourceTree = "<group>"; };
+		F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
+		F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorView.swift; sourceTree = "<group>"; };
+		FE3DC9D2858A257624060AB1 /* HoloTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloTheme.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BDC624C25CBD32EBB2336127 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		88378E2DDB657F2391FFC5BD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		441B25B566C8A6ADBFF4B9C3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		518DA81DB9B99529C0C0AEBE = {
+			isa = PBXGroup;
+			children = (
+				91FB2FB616515F01E4F3B6DE /* Holograph */,
+				C8C4FB024B98E55E00D07C92 /* HolographTests */,
+				59AF37A52A1C58D0C8D2B4D4 /* HolographUITests */,
+				547D009064F7C3F13BEF3460 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		547D009064F7C3F13BEF3460 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				84337AD8D27FCD69AF2C4FC2 /* Holograph.app */,
+				BC12E2F5145D224457882A85 /* HolographTests.xctest */,
+				8A3D1D552712E12F81E1CBBF /* HolographUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		91FB2FB616515F01E4F3B6DE /* Holograph */ = {
+			isa = PBXGroup;
+			children = (
+				C0BB36F384E9BE68E4C8DC8B /* App */,
+				B65CA15E1F62AACCDE6AC9C7 /* Demo */,
+				88A2DC15DA1F9B91C1838FDD /* Features */,
+				FA41AE3BDFF0C39922F43DF9 /* Models */,
+				8F0C70454C76436D33F19F6F /* Persistence */,
+				487B915A1AE6C28B3AB83E46 /* Resources */,
+				82792A0265341EE73F64A21D /* Services */,
+				7EB11C64B1E7E95A1EF67058 /* Support */,
+				2D39B4CBEC0FE2103BC9A6FE /* Info.plist */,
+			);
+			path = Holograph;
+			sourceTree = "<group>";
+		};
+		C0BB36F384E9BE68E4C8DC8B /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1A9DA080B4D789F02B83DEF8 /* AppServices.swift */,
+				341D02C7FA64F8F23F23639E /* HolographApp.swift */,
+				9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		B65CA15E1F62AACCDE6AC9C7 /* Demo */ = {
+			isa = PBXGroup;
+			children = (
+				239FAC8B9251AA6EC0139A7E /* DemoContent.swift */,
+				8085B5096507AF585918BA8D /* DemoIconArtwork.swift */,
+			);
+			path = Demo;
+			sourceTree = "<group>";
+		};
+		88A2DC15DA1F9B91C1838FDD /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				68C4EB41F6E412702F128E32 /* Holographic */,
+				DC0C6C128311E80842BB103E /* Launcher */,
+				B2D1BE2024E9FDDF48CD4A87 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		68C4EB41F6E412702F128E32 /* Holographic */ = {
+			isa = PBXGroup;
+			children = (
+				505B37E8AD6BBE7D77F87D5C /* HoloBackgroundView.swift */,
+				7A6A554428741222E1945ABB /* HolographicIconView.swift */,
+				9C099C1ABD945FB3849DC003 /* HoloMotion.swift */,
+				FE3DC9D2858A257624060AB1 /* HoloTheme.swift */,
+				1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */,
+				74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */,
+			);
+			path = Holographic;
+			sourceTree = "<group>";
+		};
+		DC0C6C128311E80842BB103E /* Launcher */ = {
+			isa = PBXGroup;
+			children = (
+				03956C5671B68FDCFE69DFCF /* EmptyLauncherView.swift */,
+				3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */,
+				AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */,
+				BDAD34C8E4FECEB823E33A42 /* LauncherScreen.swift */,
+				7A6935094BC5FDE86B2EC945 /* LauncherViewModel.swift */,
+				B19529D587E01BB8D5DF09DE /* LoadingScreen.swift */,
+				DB5652E29C8518F769C113B7 /* PageIndicator.swift */,
+			);
+			path = Launcher;
+			sourceTree = "<group>";
+		};
+		B2D1BE2024E9FDDF48CD4A87 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */,
+				80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */,
+				F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		FA41AE3BDFF0C39922F43DF9 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				38646CD3BC3EABD5F6B43584 /* LauncherItem.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8F0C70454C76436D33F19F6F /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				6038523860A1A525D191193E /* InMemoryLauncherRepository.swift */,
+				080C0D0BBA8060A48D93ABAE /* LauncherRepository.swift */,
+				E766AEDBAF4C1E1D67FD5C1C /* ModelContainerFactory.swift */,
+				EDA647AD3FF45893A0F91BF3 /* StoredLauncherApp.swift */,
+				08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		487B915A1AE6C28B3AB83E46 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				0A06365E98CE4387A5697824 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		82792A0265341EE73F64A21D /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C5059B443A7FC5D456320C66 /* AppLaunching.swift */,
+				1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */,
+				784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */,
+				4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */,
+				F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */,
+				2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */,
+				A484FD65121E780E48A76D30 /* SelectionStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		7EB11C64B1E7E95A1EF67058 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				77F539C57FB878DB5F796B17 /* AccessibilityID.swift */,
+				E21F2EDCED1B1AD8048733D8 /* PreviewSupport.swift */,
+				0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		C8C4FB024B98E55E00D07C92 /* HolographTests */ = {
+			isa = PBXGroup;
+			children = (
+				B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */,
+				1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */,
+				86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */,
+				BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */,
+				9795AB2394722BC0A465035C /* DemoContentTests.swift */,
+				77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */,
+				507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */,
+				01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */,
+				4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */,
+				1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */,
+			);
+			path = HolographTests;
+			sourceTree = "<group>";
+		};
+		59AF37A52A1C58D0C8D2B4D4 /* HolographUITests */ = {
+			isa = PBXGroup;
+			children = (
+				33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */,
+				F0CE3D119D328B3553DE84B8 /* CarouselUITests.swift */,
+				014244B3CB9D330A6873DD37 /* LauncherFlowUITests.swift */,
+				1EF7ECF074794B8A13B19D7F /* LauncherUITestCase.swift */,
+			);
+			path = HolographUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2FD30797D805A4AE381BBF4A /* Holograph */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7FF4C352AC34EE36A6EDFA74 /* Build configuration list for PBXNativeTarget "Holograph" */;
+			buildPhases = (
+				FE3D325F75D3F091F76C2BD2 /* Sources */,
+				BDC624C25CBD32EBB2336127 /* Frameworks */,
+				B40C51B7722E586CFCEA462F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Holograph;
+			productName = Holograph;
+			productReference = 84337AD8D27FCD69AF2C4FC2 /* Holograph.app */;
+			productType = com.apple.product-type.application;
+		};
+		53F24B866E9E680EA4C5CE3D /* HolographTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 07FE9623A03847E9FE6C72A9 /* Build configuration list for PBXNativeTarget "HolographTests" */;
+			buildPhases = (
+				DE824FE8560AED3E97A7A58A /* Sources */,
+				88378E2DDB657F2391FFC5BD /* Frameworks */,
+				47DC4497972C0C1CA48F30B7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				19DDEB6596FFBDF797557BA7 /* PBXTargetDependency */,
+			);
+			name = HolographTests;
+			productName = HolographTests;
+			productReference = BC12E2F5145D224457882A85 /* HolographTests.xctest */;
+			productType = com.apple.product-type.bundle.unit-test;
+		};
+		0A624E19FCCA69FC275CD68A /* HolographUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 61A7E1E8E36188A70EF207C8 /* Build configuration list for PBXNativeTarget "HolographUITests" */;
+			buildPhases = (
+				37B33E60C842FC735EFCACA1 /* Sources */,
+				441B25B566C8A6ADBFF4B9C3 /* Frameworks */,
+				9F5BCD7BA66ED33E10982BFD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B9A5C21F7B69C03F27167CE3 /* PBXTargetDependency */,
+			);
+			name = HolographUITests;
+			productName = HolographUITests;
+			productReference = 8A3D1D552712E12F81E1CBBF /* HolographUITests.xctest */;
+			productType = com.apple.product-type.bundle.ui-testing;
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					2FD30797D805A4AE381BBF4A = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					53F24B866E9E680EA4C5CE3D = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 2FD30797D805A4AE381BBF4A;
+					};
+					0A624E19FCCA69FC275CD68A = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 2FD30797D805A4AE381BBF4A;
+					};
+				};
+			};
+			buildConfigurationList = 1F4E3D13C2320EDA50221924 /* Build configuration list for PBXProject "Holograph" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 518DA81DB9B99529C0C0AEBE;
+			productRefGroup = 547D009064F7C3F13BEF3460 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2FD30797D805A4AE381BBF4A /* Holograph */,
+				53F24B866E9E680EA4C5CE3D /* HolographTests */,
+				0A624E19FCCA69FC275CD68A /* HolographUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B40C51B7722E586CFCEA462F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0888778AE4AC523479E82C0E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		47DC4497972C0C1CA48F30B7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9F5BCD7BA66ED33E10982BFD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FE3D325F75D3F091F76C2BD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				26F1D6B8A66FB9A55B655AAD /* AccessibilityID.swift in Sources */,
+				23C8620555949AA228D6F7EF /* AppEditorView.swift in Sources */,
+				FD2B52B5B6D148E77DFA32A1 /* AppEditorViewModel.swift in Sources */,
+				68B7BFCF7EB568ADB06007CA /* AppLaunching.swift in Sources */,
+				0FFCF3D438E872A9C282A35C /* AppServices.swift in Sources */,
+				D1B4449D8C19CD4AF7BAE369 /* AppStoreLookupService.swift in Sources */,
+				9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */,
+				807497263DE17FA364CE9B42 /* DemoContent.swift in Sources */,
+				6CF5C3AD16DF011A142E4538 /* DemoIconArtwork.swift in Sources */,
+				19A2718C7151CA2EA73485E4 /* EmptyLauncherView.swift in Sources */,
+				F408FF5CD75F691AB46D1FAC /* HapticFeedback.swift in Sources */,
+				6D64F849267A6B00A198061E /* HoloBackgroundView.swift in Sources */,
+				DC40FF39DDC1A617DA982E7C /* HoloMotion.swift in Sources */,
+				3EED5D27BC217F6E21FEA78F /* HoloTheme.swift in Sources */,
+				68D9D1BD274747F2F5BBFA30 /* HolographApp.swift in Sources */,
+				B19DE4E04AD9BD7444632B19 /* HolographicCarousel.swift in Sources */,
+				CEF809E33AA46267F977EFD0 /* HolographicIconView.swift in Sources */,
+				51F818343A8C821F3404AE5F /* IconArtworkView.swift in Sources */,
+				4D44A4FB9FF0677BC1538FC6 /* IconProcessor.swift in Sources */,
+				BCC037B1A5D8F1F597479453 /* InMemoryLauncherRepository.swift in Sources */,
+				61038835CF496632377F4205 /* LaunchEnvironment.swift in Sources */,
+				B1E567A98B64D4E71DF91452 /* LaunchURLValidator.swift in Sources */,
+				74D4C75B205DC9F06832898C /* LauncherItem.swift in Sources */,
+				AB4F2869662119214BE296E9 /* LauncherLayout.swift in Sources */,
+				C3BA99E29F48DE0AE2EF3CDE /* LauncherRepository.swift in Sources */,
+				DA5F699FCEB6156D363D69DF /* LauncherScreen.swift in Sources */,
+				C74D38AD278D6045AE68EE5B /* LauncherViewModel.swift in Sources */,
+				3E6231D2FB8ABF17E4BAAA33 /* LoadingScreen.swift in Sources */,
+				8CF1F164E4189DE9A2612FBD /* ModelContainerFactory.swift in Sources */,
+				633D42495B20B1AB39DE78FA /* PageIndicator.swift in Sources */,
+				4CC03438C803E6DD3D103100 /* PortalLaunchOverlay.swift in Sources */,
+				3C9E61D37DF27C87E7936EC6 /* PreviewSupport.swift in Sources */,
+				307CBA5ED99317F1710FC881 /* SelectionStore.swift in Sources */,
+				7292FD8356B1C5D5B382BB4F /* SettingsSheet.swift in Sources */,
+				2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */,
+				7F7EAF8B848406BEDC90A81B /* StubAppLauncher.swift in Sources */,
+				DCB8F952E7AC0137E5F5E43B /* SwiftDataLauncherRepository.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DE824FE8560AED3E97A7A58A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC3E4452EEEDAA3F654047A1 /* AppEditorViewModelTests.swift in Sources */,
+				13277315FA1595FAD68DB32C /* AppStoreLookupTests.swift in Sources */,
+				A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */,
+				0F2C5B1B7CEB89591D8F6721 /* CarouselGeometryTests.swift in Sources */,
+				0EBCF848064C6917F8E44750 /* DemoContentTests.swift in Sources */,
+				A0651CF85CBA7439BCF5F6C3 /* IconProcessorTests.swift in Sources */,
+				9477E227CF3AF0E556BD8DD1 /* LaunchURLValidatorTests.swift in Sources */,
+				2BE29D5DACEA3A8882C2C4A8 /* LauncherRepositoryTests.swift in Sources */,
+				E6230B7725CBF181FC4B229B /* LauncherViewModelTests.swift in Sources */,
+				F2F44FD4ABD035FB4C718FD8 /* TestFixtures.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		37B33E60C842FC735EFCACA1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A8D1B7B0DEBEE97EB1D50CD8 /* AppearanceUITests.swift in Sources */,
+				E435AB063BC77B62705EEE41 /* CarouselUITests.swift in Sources */,
+				709A1FFC51D6DB603AA7853F /* LauncherFlowUITests.swift in Sources */,
+				3E669F2AEF16356E0D794700 /* LauncherUITestCase.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		19DDEB6596FFBDF797557BA7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2FD30797D805A4AE381BBF4A /* Holograph */;
+			targetProxy = BC3758110F199D17D303E045 /* PBXContainerItemProxy */;
+		};
+		B9A5C21F7B69C03F27167CE3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2FD30797D805A4AE381BBF4A /* Holograph */;
+			targetProxy = 129D349CF4E99FB087FCFF2D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4A43692AD8BCEEB8B727C85B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		C28449456A5A705A7479770B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf-with-dsym;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7ADC5991A06643299FBEB639 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Holograph/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph;
+				PRODUCT_MODULE_NAME = Holograph;
+				PRODUCT_NAME = Holograph;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		DB2C248930D40A261092F599 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Holograph/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph;
+				PRODUCT_MODULE_NAME = Holograph;
+				PRODUCT_NAME = Holograph;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+		B92AD32253F11EF43FB2ABF4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Holograph.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Holograph";
+			};
+			name = Debug;
+		};
+		B1AA1C88569125F0C67024FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Holograph.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Holograph";
+			};
+			name = Release;
+		};
+		29FC4FC829F764A59120156C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = Holograph;
+			};
+			name = Debug;
+		};
+		5921136DFB854434C880D338 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idlery.holograph.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = Holograph;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F4E3D13C2320EDA50221924 /* Build configuration list for PBXProject "Holograph" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A43692AD8BCEEB8B727C85B /* Debug */,
+				C28449456A5A705A7479770B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7FF4C352AC34EE36A6EDFA74 /* Build configuration list for PBXNativeTarget "Holograph" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7ADC5991A06643299FBEB639 /* Debug */,
+				DB2C248930D40A261092F599 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		07FE9623A03847E9FE6C72A9 /* Build configuration list for PBXNativeTarget "HolographTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B92AD32253F11EF43FB2ABF4 /* Debug */,
+				B1AA1C88569125F0C67024FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		61A7E1E8E36188A70EF207C8 /* Build configuration list for PBXNativeTarget "HolographUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				29FC4FC829F764A59120156C /* Debug */,
+				5921136DFB854434C880D338 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+}

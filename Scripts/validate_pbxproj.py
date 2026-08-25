@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PBXPROJ = ROOT / "IdleryLauncher.xcodeproj" / "project.pbxproj"
+PBXPROJ = ROOT / "Holograph.xcodeproj" / "project.pbxproj"
 
 TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|[A-Za-z0-9_./$+-]+|[{}()=,;]')
 
@@ -167,7 +167,7 @@ def main() -> int:
 
     on_disk = {
         path.name
-        for directory in ("IdleryLauncher", "IdleryLauncherTests", "IdleryLauncherUITests")
+        for directory in ("Holograph", "HolographTests", "HolographUITests")
         for path in (ROOT / directory).rglob("*.swift")
     }
     missing = sorted(on_disk - set(compiled))

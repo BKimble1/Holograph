@@ -26,9 +26,9 @@ jobs:
       - name: Xcode project is up to date with the source tree
         run: |
           python3 Scripts/generate_xcodeproj.py
-          if ! git diff --quiet -- IdleryLauncher.xcodeproj; then
-            echo "::error::IdleryLauncher.xcodeproj is stale. Run 'python3 Scripts/generate_xcodeproj.py' and commit the result."
-            git --no-pager diff -- IdleryLauncher.xcodeproj
+          if ! git diff --quiet -- Holograph.xcodeproj; then
+            echo "::error::Holograph.xcodeproj is stale. Run 'python3 Scripts/generate_xcodeproj.py' and commit the result."
+            git --no-pager diff -- Holograph.xcodeproj
             exit 1
           fi
 
@@ -37,17 +37,17 @@ jobs:
           python3 - <<'PY'
           import json, plistlib, pathlib, sys
           problems = []
-          for path in pathlib.Path("IdleryLauncher/Resources").rglob("Contents.json"):
+          for path in pathlib.Path("Holograph/Resources").rglob("Contents.json"):
               try:
                   json.loads(path.read_text())
               except Exception as error:
                   problems.append(f"{path}: {error}")
           try:
-              info = plistlib.loads(pathlib.Path("IdleryLauncher/Info.plist").read_bytes())
+              info = plistlib.loads(pathlib.Path("Holograph/Info.plist").read_bytes())
           except Exception as error:
               problems.append(f"Info.plist: {error}")
               info = {}
-          icon = pathlib.Path("IdleryLauncher/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
+          icon = pathlib.Path("Holograph/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
           if not icon.exists():
               problems.append("the 1024x1024 app icon is missing")
           if problems:
@@ -130,8 +130,8 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
-            -project IdleryLauncher.xcodeproj \
-            -scheme IdleryLauncher \
+            -project Holograph.xcodeproj \
+            -scheme Holograph \
             -configuration Debug \
             -destination "id=${SIMULATOR_UDID}" \
             -derivedDataPath build \
@@ -145,17 +145,60 @@ jobs:
             grep -E "warning:" build.log | sort -u | head -50 >> "$GITHUB_STEP_SUMMARY" || echo "None." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Smoke-launch the app
+        if: always()
+        timeout-minutes: 10
+        run: |
+          set +e
+          APP="build/Build/Products/Debug-iphonesimulator/Holograph.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::$APP was not produced by the build"
+            exit 1
+          fi
+          echo "--- bundle contents ---"
+          ls -la "$APP"
+          /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" | head -60
+
+          xcrun simctl install "${SIMULATOR_UDID}" "$APP" || {
+            echo "::error::simctl install failed"; exit 1;
+          }
+
+          echo "--- launching, streaming the app's own output ---"
+          # A plain launch shows a crash directly, instead of it being reported
+          # only as "crashed before establishing connection" by the test runner.
+          timeout 45 xcrun simctl launch --console-pty --terminate-running-process \
+            "${SIMULATOR_UDID}" com.idlery.holograph \
+            -seedDemoApps -inMemoryStore -disableAnimations
+          echo "launch stream ended with $?"
+
+          echo "--- did it stay up? ---"
+          if xcrun simctl spawn "${SIMULATOR_UDID}" launchctl list 2>/dev/null | grep -q holograph; then
+            echo "app is running"
+          else
+            echo "app is NOT running"
+          fi
+
+          echo "--- crash reports in the last 15 minutes ---"
+          find ~/Library/Logs/DiagnosticReports -name '*.ips' -mmin -15 2>/dev/null | while read -r report; do
+            echo "===== $report ====="
+            head -c 6000 "$report"
+            echo
+          done
+          exit 0
+
       - name: Run unit tests
+        id: unit-tests
+        continue-on-error: true
         timeout-minutes: 20
         run: |
           set -o pipefail
           xcodebuild test-without-building \
-            -project IdleryLauncher.xcodeproj \
-            -scheme IdleryLauncher \
+            -project Holograph.xcodeproj \
+            -scheme Holograph \
             -configuration Debug \
             -destination "id=${SIMULATOR_UDID}" \
             -derivedDataPath build \
-            -only-testing:IdleryLauncherTests \
+            -only-testing:HolographTests \
             -resultBundlePath UnitTests.xcresult \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 60 \
@@ -163,21 +206,52 @@ jobs:
             | tee unit-tests.log
 
       - name: Run UI tests
+        id: ui-tests
+        continue-on-error: true
+        if: always()
         timeout-minutes: 30
         run: |
           set -o pipefail
           xcodebuild test-without-building \
-            -project IdleryLauncher.xcodeproj \
-            -scheme IdleryLauncher \
+            -project Holograph.xcodeproj \
+            -scheme Holograph \
             -configuration Debug \
             -destination "id=${SIMULATOR_UDID}" \
             -derivedDataPath build \
-            -only-testing:IdleryLauncherUITests \
+            -only-testing:HolographUITests \
             -resultBundlePath UITests.xcresult \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
             -maximum-test-execution-time-allowance 300 \
             | tee ui-tests.log
+
+      - name: Diagnose any crash
+        if: always()
+        run: |
+          set +e
+          echo "### Crash diagnostics" >> "$GITHUB_STEP_SUMMARY"
+
+          for bundle in UnitTests.xcresult UITests.xcresult; do
+            [ -d "$bundle" ] || continue
+            echo "--- $bundle test summary ---"
+            xcrun xcresulttool get test-results summary --path "$bundle" 2>/dev/null | head -60
+            echo "--- $bundle failures ---"
+            xcrun xcresulttool get test-results tests --path "$bundle" 2>/dev/null \
+              | grep -iE '"(name|result|failureText|message)"' | head -80
+          done
+
+          echo "--- simulator crash reports from this run ---"
+          reports="$(find ~/Library/Logs/DiagnosticReports -name '*.ips' -mmin -45 2>/dev/null | head -6)"
+          if [ -z "$reports" ]; then
+            echo "(none found)"
+          fi
+          for report in $reports; do
+            echo "===== $report ====="
+            # The first JSON line is the summary; the body names the faulting frame.
+            head -c 8000 "$report"
+            echo
+          done
+          exit 0
 
       - name: Export screenshots from the UI test results
         if: always()
@@ -230,6 +304,18 @@ jobs:
           path: screenshots
           retention-days: 14
           if-no-files-found: ignore
+
+      - name: Fail if either suite failed
+        if: always()
+        run: |
+          unit="${{ steps.unit-tests.outcome }}"
+          ui="${{ steps.ui-tests.outcome }}"
+          echo "unit tests: $unit"
+          echo "ui tests:   $ui"
+          if [ "$unit" != "success" ] || [ "$ui" != "success" ]; then
+            echo "::error::Tests failed (unit: $unit, ui: $ui)"
+            exit 1
+          fi
 
       - name: Upload logs and result bundles
         if: always()

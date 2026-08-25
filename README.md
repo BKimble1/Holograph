@@ -1,10 +1,10 @@
-# Idlery Launcher
+# Holograph
 
 An iPad-only holographic launcher. One immersive screen, a carousel of your own
 app icons rendered behind cyan glass, and a tap that opens the real app.
 
-- **Product name** Idlery Launcher · **Display name** Launcher
-- **Bundle identifier** `com.idlery.launcher`
+- **Product name** Holograph · **Display name** Holograph
+- **Bundle identifier** `com.idlery.holograph` · **App Store Connect record** Holograph Launcher
 - **Platform** iPadOS 17+, iPad only (`TARGETED_DEVICE_FAMILY = 2`)
 - **Lifecycle** SwiftUI · **Language** Swift 6 · **Dependencies** none
 
@@ -17,10 +17,10 @@ embedded, nothing is enumerated.
 ## Getting started
 
 ```bash
-open IdleryLauncher.xcodeproj
+open Holograph.xcodeproj
 ```
 
-Choose the **IdleryLauncher** scheme and an iPad simulator or device. On first
+Choose the **Holograph** scheme and an iPad simulator or device. On first
 run the launcher seeds five clearly-labelled demo tiles so the stage is never
 blank; delete them and they stay gone.
 
@@ -47,7 +47,7 @@ launcher's backdrop without a visible edge.
 
 ### Regenerating the Xcode project
 
-`IdleryLauncher.xcodeproj` is generated from the file tree so adding a source
+`Holograph.xcodeproj` is generated from the file tree so adding a source
 file never means hand-editing a `pbxproj`:
 
 ```bash
@@ -63,7 +63,7 @@ CI fails if the committed project is out of step with the source tree.
 ## How it is put together
 
 ```
-IdleryLauncher/
+Holograph/
 ├── App/                  Composition root, launch arguments, scene wiring
 ├── Models/               LauncherItem — the Sendable snapshot the UI sees
 ├── Persistence/          SwiftData model, repository protocol, two implementations
@@ -135,14 +135,14 @@ receive them, so the shipping app always takes the production path.
 
 ```bash
 # Unit tests
-xcodebuild test -project IdleryLauncher.xcodeproj -scheme IdleryLauncher \
+xcodebuild test -project Holograph.xcodeproj -scheme Holograph \
   -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' \
-  -only-testing:IdleryLauncherTests
+  -only-testing:HolographTests
 
 # UI tests
-xcodebuild test -project IdleryLauncher.xcodeproj -scheme IdleryLauncher \
+xcodebuild test -project Holograph.xcodeproj -scheme Holograph \
   -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' \
-  -only-testing:IdleryLauncherUITests
+  -only-testing:HolographUITests
 ```
 
 CI (`.github/workflows/ci.yml`) picks whichever iPad simulator the runner has,

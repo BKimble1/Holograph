@@ -27,7 +27,7 @@ Image.MAX_IMAGE_PIXELS = None
 
 ROOT = Path(__file__).resolve().parent.parent
 ART = ROOT / "Art"
-ASSETS = ROOT / "IdleryLauncher" / "Resources" / "Assets.xcassets"
+ASSETS = ROOT / "Holograph" / "Resources" / "Assets.xcassets"
 
 APP_ICON_SIZE = 1024
 LAUNCH_LOGO_SIZE = 1024

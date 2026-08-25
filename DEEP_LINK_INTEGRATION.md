@@ -1,6 +1,6 @@
 # Deep-link integration
 
-Idlery Launcher can only open an app that has told iPadOS how to be opened. That
+Holograph can only open an app that has told iPadOS how to be opened. That
 means the *target* app must register either a **custom URL scheme** or a
 **universal link**. There is no supported way for one app to launch another by
 bundle identifier, and this launcher deliberately does not try.
@@ -37,7 +37,7 @@ another developer's `offrent://`.
    - **Role**: `Editor`
 5. Build and run once on the device so iPadOS records the registration.
 
-That is the whole requirement. Tapping the tile in Idlery Launcher will now
+That is the whole requirement. Tapping the tile in Holograph will now
 foreground the app.
 
 ---

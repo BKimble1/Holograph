@@ -1,0 +1,316 @@
+import SwiftUI
+
+/// Settings sits *over* the launcher as a glass sheet rather than replacing it,
+/// so the stage stays visible behind and the app keeps one visual identity.
+@MainActor
+struct SettingsSheet: View {
+    let initialRoute: SettingsRoute?
+
+    @Environment(LauncherViewModel.self) private var model
+    @Environment(AppServices.self) private var services
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var editorTarget: EditorTarget?
+    @State private var pendingDelete: LauncherItem?
+    @State private var isConfirmingRemoveAll = false
+    @State private var testLaunchResult: TestLaunchResult?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                appsSection
+                librarySection
+                aboutSection
+            }
+            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
+            .navigationTitle("Launcher Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .accessibilityIdentifier(AccessibilityID.settingsDone)
+                }
+            }
+            .navigationDestination(item: $editorTarget) { target in
+                AppEditorView(target: target, services: services)
+            }
+        }
+        .tint(HoloTheme.cyanBright)
+        .preferredColorScheme(.dark)
+        .presentationBackground(.ultraThinMaterial)
+        .presentationDetents([.large])
+        .accessibilityIdentifier(AccessibilityID.settingsSheet)
+        .onAppear(perform: applyInitialRoute)
+        .alert(
+            "Delete \(pendingDelete?.name ?? "app")?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { item in
+            Button("Delete", role: .destructive) {
+                model.delete(id: item.id)
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: { item in
+            Text("\(item.name) will be removed from your launcher. The app itself stays installed.")
+        }
+        .alert("Remove all apps?", isPresented: $isConfirmingRemoveAll) {
+            Button("Remove All", role: .destructive) { model.removeAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every app you have added will be removed from the launcher. Nothing is uninstalled from your iPad.")
+        }
+        .alert(
+            testLaunchResult?.title ?? "",
+            isPresented: Binding(
+                get: { testLaunchResult != nil },
+                set: { if !$0 { testLaunchResult = nil } }
+            ),
+            presenting: testLaunchResult
+        ) { _ in
+            Button("OK", role: .cancel) { testLaunchResult = nil }
+        } message: { result in
+            Text(result.message)
+        }
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var appsSection: some View {
+        Section {
+            if model.items.isEmpty {
+                Text("No apps yet. Add one to fill the launcher.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(model.items) { item in
+                    row(for: item)
+                }
+                .onMove { source, destination in
+                    model.move(fromOffsets: source, toOffset: destination)
+                }
+                .onDelete { offsets in
+                    guard let index = offsets.first, model.items.indices.contains(index) else { return }
+                    pendingDelete = model.items[index]
+                }
+            }
+
+            Button {
+                editorTarget = .add
+            } label: {
+                Label("Add App", systemImage: "plus.circle.fill")
+            }
+            .accessibilityIdentifier(AccessibilityID.addApp)
+        } header: {
+            Text("Your Apps")
+        } footer: {
+            Text("Drag to reorder, or use each app’s menu. The order here is the order on the launcher.")
+        }
+    }
+
+    private func row(for item: LauncherItem) -> some View {
+        HStack(spacing: 14) {
+            IconArtworkView(item: item, size: 44)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 44 * HoloTheme.tileCornerRatio, style: .continuous)
+                        .strokeBorder(HoloTheme.cyan.opacity(0.35), lineWidth: 1)
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(item.name)
+                        .font(.body)
+                    if item.isDemo {
+                        Text("DEMO")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .tracking(0.8)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(HoloTheme.cyan.opacity(0.22), in: Capsule())
+                            .foregroundStyle(HoloTheme.cyanBright)
+                    }
+                }
+                Text(item.launchURL.absoluteString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer(minLength: 0)
+
+            rowMenu(for: item)
+        }
+        .accessibilityIdentifier(AccessibilityID.appRow(item.name))
+    }
+
+    private func rowMenu(for item: LauncherItem) -> some View {
+        Menu {
+            Button {
+                editorTarget = .edit(item)
+            } label: {
+                Label("Edit App", systemImage: "square.and.pencil")
+            }
+            .accessibilityIdentifier(AccessibilityID.appRowEdit(item.name))
+
+            Button {
+                Task { await testLaunch(item) }
+            } label: {
+                Label("Test Launch", systemImage: "arrow.up.forward.app")
+            }
+
+            if let index = model.items.firstIndex(where: { $0.id == item.id }) {
+                Button {
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1)
+                } label: {
+                    Label("Move Up", systemImage: "arrow.up")
+                }
+                .disabled(index == 0)
+                .accessibilityIdentifier(AccessibilityID.appRowMoveUp(item.name))
+
+                Button {
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2)
+                } label: {
+                    Label("Move Down", systemImage: "arrow.down")
+                }
+                .disabled(index >= model.items.count - 1)
+                .accessibilityIdentifier(AccessibilityID.appRowMoveDown(item.name))
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                pendingDelete = item
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .accessibilityIdentifier(AccessibilityID.appRowDelete(item.name))
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title3)
+                .foregroundStyle(HoloTheme.cyanBright)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier(AccessibilityID.appRowMenu(item.name))
+        .accessibilityLabel("Actions for \(item.name)")
+    }
+
+    private var librarySection: some View {
+        Section {
+            Button {
+                model.restoreDemoApps()
+            } label: {
+                Label("Restore Demo Apps", systemImage: "sparkles")
+            }
+            .accessibilityIdentifier(AccessibilityID.restoreDemoApps)
+
+            Button(role: .destructive) {
+                isConfirmingRemoveAll = true
+            } label: {
+                Label("Remove All Apps", systemImage: "trash")
+            }
+            .disabled(model.items.isEmpty)
+            .accessibilityIdentifier(AccessibilityID.removeAllApps)
+        } header: {
+            Text("Library")
+        } footer: {
+            Text("Restoring demo apps replaces everything in the launcher with the five sample tiles. Demo tiles are placeholders — nothing on this iPad answers their links.")
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            LabeledContent("Version", value: AppInfo.versionDescription)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Holograph opens apps you already have installed by using the link each app registers with iPadOS.")
+                Text("It never inspects what is installed on your iPad, and nothing you add leaves this device.")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Behaviour
+
+    private func applyInitialRoute() {
+        guard editorTarget == nil, let initialRoute else { return }
+        switch initialRoute {
+        case .add:
+            editorTarget = .add
+        case .edit(let id):
+            if let item = model.items.first(where: { $0.id == id }) {
+                editorTarget = .edit(item)
+            }
+        }
+    }
+
+    private func testLaunch(_ item: LauncherItem) async {
+        let opened = await model.testLaunch(item.launchURL)
+        testLaunchResult = TestLaunchResult(succeeded: opened, name: item.name, url: item.launchURL)
+    }
+}
+
+/// What the editor should be doing when it appears.
+enum EditorTarget: Hashable, Identifiable {
+    case add
+    case edit(LauncherItem)
+
+    var id: String {
+        switch self {
+        case .add: return "add"
+        case .edit(let item): return "edit-\(item.id.uuidString)"
+        }
+    }
+
+    var existingItem: LauncherItem? {
+        switch self {
+        case .add: return nil
+        case .edit(let item): return item
+        }
+    }
+}
+
+/// The real outcome of a Test Launch — never a canned "success".
+struct TestLaunchResult: Identifiable, Equatable {
+    let id = UUID()
+    let succeeded: Bool
+    let name: String
+    let url: URL
+
+    var title: String { succeeded ? "\(name) opened" : "\(name) didn’t open" }
+
+    var message: String {
+        succeeded
+            ? "iPadOS handed \(url.absoluteString) to another app."
+            : "iPadOS declined to open \(url.absoluteString). Check that the app is installed and registers that link."
+    }
+}
+
+enum AppInfo {
+    static var versionDescription: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        return "\(short) (\(build))"
+    }
+}
+
+#Preview("Settings — populated") {
+    SheetPreviewHost { _ in
+        SettingsSheet(initialRoute: nil)
+    }
+}
+
+#Preview("Settings — nothing added yet") {
+    SheetPreviewHost(items: []) { _ in
+        SettingsSheet(initialRoute: nil)
+    }
+}

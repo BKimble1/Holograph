@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DIRECTORIES = ["IdleryLauncher", "IdleryLauncherTests", "IdleryLauncherUITests"]
+DIRECTORIES = ["Holograph", "HolographTests", "HolographUITests"]
 OPENERS = {"(": ")", "[": "]", "{": "}"}
 PRINT_CALL = re.compile(r"(?<![\w.])print\s*\(")
 CLOSERS = {value: key for key, value in OPENERS.items()}
@@ -165,7 +165,7 @@ def main() -> int:
                 failures.append(f"{relative}:{problem.line}: {problem.message}")
 
             # A few project conventions worth enforcing mechanically.
-            if directory == "IdleryLauncher":
+            if directory == "Holograph":
                 for number, text in enumerate(source.splitlines(), start=1):
                     stripped = text.strip()
                     if stripped.startswith("//"):
