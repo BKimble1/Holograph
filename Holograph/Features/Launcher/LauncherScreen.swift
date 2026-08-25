@@ -5,10 +5,12 @@ import SwiftUI
 struct LauncherScreen: View {
     @Environment(LauncherViewModel.self) private var model
     @Environment(HoloMotion.self) private var motion
+    @Environment(AppServices.self) private var services
 
     @State private var settingsRoute: SettingsRoute?
     @State private var isSettingsPresented = false
     @FocusState private var isStageFocused: Bool
+    @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
 
     var body: some View {
         // The backdrop is a sibling of the stage rather than a layer inside it.
@@ -43,6 +45,13 @@ struct LauncherScreen: View {
         .onKeyPress(.return) { activateSelected(); return .handled }
         .onKeyPress(.space) { activateSelected(); return .handled }
         .onAppear { isStageFocused = true }
+        // The camera runs only while the launcher is on screen, switched on, and
+        // the scene is active — never behind Settings, and never in the
+        // background.
+        .onChange(of: airGesturesEnabled, initial: true) { _, _ in updateAirGestures() }
+        .onChange(of: motion.isSceneActive) { _, _ in updateAirGestures() }
+        .onChange(of: isSettingsPresented) { _, _ in updateAirGestures() }
+        .onDisappear { services.airGestures.stop() }
         .sheet(isPresented: $isSettingsPresented, onDismiss: { settingsRoute = nil }) {
             SettingsSheet(initialRoute: settingsRoute)
                 .environment(model)
@@ -192,6 +201,32 @@ struct LauncherScreen: View {
                 model.updateSelection(newValue)
             }
         )
+    }
+
+    private func updateAirGestures() {
+        let shouldWatch = airGesturesEnabled && motion.isSceneActive && !isSettingsPresented
+        guard shouldWatch else {
+            services.airGestures.stop()
+            return
+        }
+
+        // Only the two objects are captured, not the view: the handler outlives
+        // this body, and a copied view struct would be a stale thing to hold.
+        let model = model
+        let motion = motion
+        services.airGestures.onSwipe = { swipe in
+            guard !model.isEmpty else { return }
+            // The wall moves the way the hand went, which is how a swipe on the
+            // glass already behaves: push the apps left and the next one
+            // arrives from the right.
+            withAnimation(motion.transition) {
+                switch swipe {
+                case .left: model.selectNext()
+                case .right: model.selectPrevious()
+                }
+            }
+        }
+        services.airGestures.start()
     }
 
     private func moveSelection(by delta: Int) {

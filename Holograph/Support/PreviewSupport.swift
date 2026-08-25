@@ -37,6 +37,7 @@ final class PreviewHarness {
             launcher: launcher,
             feedback: feedback,
             sound: sound,
+            airGestures: InertAirGestureSource(),
             selectionStore: selectionStore,
             metadataProvider: PreviewMetadataProvider()
         )

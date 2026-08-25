@@ -11,6 +11,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var editorTarget: EditorTarget?
+    @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
     @AppStorage(SoundPreferences.effectsKey) private var soundEffectsEnabled = true
     @AppStorage(SoundPreferences.spokenLaunchKey) private var spokenLaunchEnabled = true
 
@@ -22,6 +23,7 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 appsSection
+                airGestureSection
                 soundSection
                 librarySection
                 aboutSection
@@ -210,6 +212,43 @@ struct SettingsSheet: View {
         }
         .accessibilityIdentifier(AccessibilityID.appRowMenu(item.name))
         .accessibilityLabel("Actions for \(item.name)")
+    }
+
+    /// Switched off until asked for, because it runs the camera. Turning it on
+    /// is what asks for permission — nothing is requested at launch.
+    private var airGestureSection: some View {
+        Section {
+            Toggle(isOn: $airGesturesEnabled) {
+                Label("Wave to Change Apps", systemImage: "hand.wave")
+            }
+            .accessibilityIdentifier(AccessibilityID.airGestures)
+            .onChange(of: airGesturesEnabled) { _, isOn in
+                guard isOn else { return }
+                Task { await confirmCameraAccess() }
+            }
+        } header: {
+            Text("Air Gestures")
+        } footer: {
+            Text("Flick a hand left or right in front of the screen, from a foot or two away, to move between apps. The camera is used only while the launcher is open — nothing is recorded, and no video leaves the iPad.")
+        }
+    }
+
+    /// Asks for the camera the moment the switch is turned on, and turns it back
+    /// off if the answer is no — a switch that claims to be on while nothing
+    /// works is worse than one that refuses.
+    private func confirmCameraAccess() async {
+        #if os(iOS)
+        guard await CameraAirGestureSource.requestAccess() else {
+            airGesturesEnabled = false
+            model.alert = LauncherAlert(
+                title: "Camera access is off",
+                message: CameraAirGestureSource.isAccessDenied
+                    ? "Air gestures need the camera. Turn it on for Holograph in the Settings app, under Privacy & Security → Camera."
+                    : "Air gestures need the camera, and permission was not granted."
+            )
+            return
+        }
+        #endif
     }
 
     /// Read straight from defaults by the sound service at the point of use, so

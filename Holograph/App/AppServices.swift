@@ -13,6 +13,7 @@ final class AppServices {
     let launcher: AppLaunching
     let feedback: FeedbackProviding
     let sound: SoundPlaying
+    let airGestures: AirGestureObserving
     let selectionStore: SelectionStoring
     let iconProcessor: IconProcessor
     let metadataProvider: AppStoreMetadataProviding
@@ -22,6 +23,7 @@ final class AppServices {
         launcher: AppLaunching,
         feedback: FeedbackProviding,
         sound: SoundPlaying,
+        airGestures: AirGestureObserving,
         selectionStore: SelectionStoring,
         iconProcessor: IconProcessor = IconProcessor(),
         metadataProvider: AppStoreMetadataProviding = AppStoreLookupService()
@@ -30,6 +32,7 @@ final class AppServices {
         self.launcher = launcher
         self.feedback = feedback
         self.sound = sound
+        self.airGestures = airGestures
         self.selectionStore = selectionStore
         self.iconProcessor = iconProcessor
         self.metadataProvider = metadataProvider
@@ -87,6 +90,15 @@ struct AppComposition {
         // start an audio engine inside a test host.
         let staysQuiet = environment.isUITesting || LaunchEnvironment.isHostingUnitTests
         let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
+
+        // Tests get a stub: there is no camera in the simulator, and a UI test
+        // must not depend on one.
+        let airGestures: AirGestureObserving
+        #if os(iOS)
+        airGestures = staysQuiet ? InertAirGestureSource() : CameraAirGestureSource()
+        #else
+        airGestures = InertAirGestureSource()
+        #endif
         let selectionStore: SelectionStoring = environment.isUITesting
             ? InMemorySelectionStore()
             : UserDefaultsSelectionStore()
@@ -96,6 +108,7 @@ struct AppComposition {
             launcher: launcher,
             feedback: feedback,
             sound: sound,
+            airGestures: airGestures,
             selectionStore: selectionStore
         )
 

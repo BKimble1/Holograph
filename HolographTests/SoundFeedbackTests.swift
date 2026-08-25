@@ -34,17 +34,43 @@ final class HoloClickTests: XCTestCase {
         XCTAssertLessThan(abs(samples[samples.count - 1]), 0.05)
     }
 
-    func testThePitchSweepsDownwards() {
+    func testItIsOverInAFewMilliseconds() {
+        // A click is brief. Much longer and the ear hears a tone instead.
+        XCTAssertLessThanOrEqual(HoloClick.duration, 0.025)
+    }
+
+    func testTheEnergyIsAtTheFront() {
+        let samples = HoloClick.waveform()
+        let peakIndex = samples.indices.max(by: { abs(samples[$0]) < abs(samples[$1]) }) ?? 0
+        let peakTime = Double(peakIndex) / HoloClick.sampleRate
+
+        // Something struck is loudest as it is struck.
+        XCTAssertLessThan(peakTime, 0.002, "the peak should arrive almost immediately")
+    }
+
+    func testItCollapsesRatherThanRingingOn() {
+        let samples = HoloClick.waveform()
+        let peak = samples.map(abs).max() ?? 0
+        // The last moment it is still a meaningful fraction of its peak.
+        let lastLoud = samples.lastIndex { abs($0) >= 0.15 * peak } ?? 0
+
+        XCTAssertLessThan(
+            Double(lastLoud) / HoloClick.sampleRate, 0.010,
+            "it should be down to a fraction of its peak within ten milliseconds"
+        )
+    }
+
+    func testTheOpeningIsBroadbandRatherThanAPitch() {
         let samples = HoloClick.waveform()
         let third = samples.count / 3
         let opening = zeroCrossings(in: Array(samples.prefix(third)))
-        let closing = zeroCrossings(in: Array(samples[(2 * third)...]))
+        let rate = Double(opening) / (Double(third) / HoloClick.sampleRate)
 
-        // Falling pitch is what makes it read as synthetic rather than mechanical.
-        XCTAssertGreaterThan(
-            opening, closing,
-            "the opening should carry more crossings than the tail if pitch falls"
-        )
+        // What separates a click from a beep is noise. The loudest single tone
+        // in here sits at 2.4 kHz, which alone would cross zero 4,800 times a
+        // second; comfortably more than that means the noise burst is present
+        // and doing the work.
+        XCTAssertGreaterThan(rate, 6_000, "the attack should be broadband, not a tone")
     }
 
     func testTheWaveformIsDeterministic() {
@@ -124,6 +150,69 @@ final class HoloClickWAVTests: XCTestCase {
                 "sample \(index) should survive quantisation"
             )
         }
+    }
+}
+
+/// Which voices exist varies by device and by what the owner has downloaded, so
+/// the ranking is tested over descriptions rather than the real voice list.
+final class HoloVoiceTests: XCTestCase {
+    private func candidate(
+        _ name: String,
+        _ language: String = "en-GB",
+        female: Bool = true,
+        quality: Int = 1
+    ) -> HoloVoice.Candidate {
+        HoloVoice.Candidate(
+            identifier: "id.\(name)", name: name,
+            language: language, isFemale: female, quality: quality
+        )
+    }
+
+    func testItPrefersABritishWoman() {
+        let chosen = HoloVoice.best(from: [
+            candidate("Daniel", female: false),
+            candidate("Samantha", "en-US"),
+            candidate("Serena"),
+        ])
+        XCTAssertEqual(chosen?.name, "Serena")
+    }
+
+    func testAccentOutranksEverythingElse() {
+        // A premium American voice is still the wrong accent.
+        let chosen = HoloVoice.best(from: [
+            candidate("Ava", "en-US", quality: 3),
+            candidate("Kate", "en-GB", quality: 1),
+        ])
+        XCTAssertEqual(chosen?.name, "Kate")
+    }
+
+    func testAWomanOutranksABetterRecordingOfAMan() {
+        let chosen = HoloVoice.best(from: [
+            candidate("Daniel", female: false, quality: 3),
+            candidate("Martha", quality: 1),
+        ])
+        XCTAssertEqual(chosen?.name, "Martha")
+    }
+
+    func testAmongEqualsTheBetterRecordingWins() {
+        let chosen = HoloVoice.best(from: [
+            candidate("Serena", quality: 1),
+            candidate("Serena", quality: 3),
+        ])
+        XCTAssertEqual(chosen?.quality, 3)
+    }
+
+    func testItFallsBackToAnyEnglishRatherThanSayingNothing() {
+        let chosen = HoloVoice.best(from: [
+            candidate("Samantha", "en-US"),
+            candidate("Amelie", "fr-FR"),
+        ])
+        XCTAssertEqual(chosen?.name, "Samantha")
+    }
+
+    func testNoEnglishVoiceLeavesTheChoiceToTheSystem() {
+        XCTAssertNil(HoloVoice.best(from: [candidate("Amelie", "fr-FR")]))
+        XCTAssertNil(HoloVoice.best(from: []))
     }
 }
 

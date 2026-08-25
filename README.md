@@ -102,19 +102,53 @@ A few decisions worth knowing about:
 
 ---
 
+## Air gestures
+
+Off by default, switched on under **Settings → Air Gestures**. Flick a hand left
+or right in front of the screen, from a foot or two away, and the wall moves the
+way your hand went — the same direction a swipe on the glass already moves it.
+
+Nothing on an iPad reports a hand waving in mid-air: there is no proximity or
+depth API for it, and ARKit body tracking is far heavier than the question
+deserves. `VNDetectHumanHandPoseRequest` returns 21 landmarks per hand from an
+ordinary camera frame, and at one to two feet the hand fills enough of the frame
+that a 640×480 feed tracks it comfortably. The gesture needs exactly one number —
+where the hand sits across the frame — so the feed is deliberately small and
+slow: VGA at roughly 18 readings a second, late frames discarded. The connection
+is mirrored, so moving your hand right moves it right in the frame, and kept
+upright as the iPad turns.
+
+Position is averaged over the wrist and the knuckles rather than read off a
+fingertip, because knuckles stay put while fingers curl. `AirSwipeDetector` then
+decides what counts: how far the hand crossed, how fast, and how straight the
+path was, followed by a cooldown so the return stroke is not read as the
+opposite swipe. It is a value type over plain numbers, so every one of those
+rules is unit-tested by playing a hand through it frame by frame — a flick, a
+drift, a small wave, a wandering path, a hand leaving the frame.
+
+The camera runs only while the launcher is on screen, the feature is on, and the
+scene is active — never behind Settings, never in the background. Nothing is
+recorded and no video leaves the device; frames are analysed and dropped, and the
+only thing that leaves the detector is a direction.
+
+---
+
 ## Sound
 
 Two accents, both on by default and both switchable in Settings:
 
-- **A tick as the carousel moves.** Synthesised rather than shipped as an audio
-  file — `HoloClick.waveform()` builds a 60 ms descending two-partial chirp under
-  a sharp exponential decay, with a bright transient on the leading edge. Being a
-  pure function of nothing, its shape is unit-tested directly: length, range,
-  decay, endpoints and the direction of the pitch sweep, with no audio hardware
-  involved.
-- **"Opening <app>" as one launches**, spoken by `AVSpeechSynthesizer` on the
-  same beat as the portal flourish. A refused launch cancels it, so the voice
-  never contradicts the recovery alert.
+- **A click as the carousel moves.** Synthesised rather than shipped as an audio
+  file. A click is a short burst of broadband energy with a resonance in it, over
+  in a few milliseconds, so `HoloClick.waveform()` builds 22 ms of filtered noise,
+  a 2.4 kHz resonance and a low knock, all decaying at once. Its noise comes from
+  a seeded generator, so the sound is identical every time and its shape is
+  unit-tested directly: how quickly it peaks, how fast it collapses, and that the
+  attack is broadband rather than a pitch.
+- **"Opening <app>" as one launches**, in a British woman's voice, unhurried and
+  level. `HoloVoice` ranks the installed voices — accent first, then the voice,
+  then the quality of the recording — and degrades to any English voice rather
+  than falling silent on a device with no en-GB voice installed. A refused launch
+  cancels it, so the voice never contradicts the recovery alert.
 
 The session is `.playback` with `.mixWithOthers`. `.ambient` would be the politer
 category, but it is silenced by the Ring/Silent switch — the Control Centre
