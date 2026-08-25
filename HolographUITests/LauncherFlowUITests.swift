@@ -150,7 +150,14 @@ final class LauncherFlowUITests: LauncherUITestCase {
 
         revealInSettings("settings.restoreDemoApps").tap()
 
-        XCTAssertTrue(appRow("Tagfield").waitForExistence(timeout: 20))
+        // Restoring inserts five rows at the *top* of a list we have just
+        // scrolled down, and rows off screen are not in the accessibility tree,
+        // so come back up to them before looking.
+        let restored = revealAboveInSettings("settings.row.Tagfield")
+        XCTAssertTrue(
+            restored.waitForExistence(timeout: 20),
+            "Restoring should repopulate the list. On screen:\n\(visibleElementSummary())"
+        )
         closeSettings()
         XCTAssertTrue(selectedAppName.waitForExistence(timeout: 20))
         XCTAssertEqual(selectedAppName.label, "Tagfield")

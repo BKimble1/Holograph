@@ -130,6 +130,20 @@ class LauncherUITestCase: XCTestCase {
         return element
     }
 
+    /// Scrolls back up the settings list until `identifier` is on screen.
+    ///
+    /// Stops the moment it finds the element: a downward drag on a sheet that is
+    /// already at the top starts dismissing the sheet rather than scrolling it.
+    @discardableResult
+    func revealAboveInSettings(_ identifier: String, attempts: Int = 5) -> XCUIElement {
+        let element = app.descendants(matching: .any)[identifier].firstMatch
+        for _ in 0..<attempts {
+            if element.exists { return element }
+            app.swipeDown(velocity: .slow)
+        }
+        return element
+    }
+
     func openSettings(file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "Settings button never appeared", file: file, line: line)
         settingsButton.tap()
