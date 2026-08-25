@@ -48,7 +48,7 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
-        .background(HoloTheme.backgroundDeep)
+        .background(HoloTheme.backgroundDeep.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .onChange(of: scenePhase, initial: true) { _, phase in
             motion.isSceneActive = (phase == .active)

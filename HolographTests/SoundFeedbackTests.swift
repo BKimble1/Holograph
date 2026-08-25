@@ -68,6 +68,65 @@ final class HoloClickTests: XCTestCase {
     }
 }
 
+/// The click is handed to AVAudioPlayer as finished bytes, so the container it
+/// is wrapped in has to be right — a malformed header is silence with no error.
+final class HoloClickWAVTests: XCTestCase {
+    private lazy var data = HoloClick.wavData()
+
+    private func ascii(at offset: Int, length: Int = 4) -> String {
+        String(decoding: data[offset..<(offset + length)], as: UTF8.self)
+    }
+
+    private func uint32(at offset: Int) -> UInt32 {
+        data[offset..<(offset + 4)].reversed().reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+    }
+
+    private func uint16(at offset: Int) -> UInt16 {
+        data[offset..<(offset + 2)].reversed().reduce(UInt16(0)) { ($0 << 8) | UInt16($1) }
+    }
+
+    func testItIsARIFFWaveFile() {
+        XCTAssertEqual(ascii(at: 0), "RIFF")
+        XCTAssertEqual(ascii(at: 8), "WAVE")
+        XCTAssertEqual(ascii(at: 12), "fmt ")
+        XCTAssertEqual(ascii(at: 36), "data")
+    }
+
+    func testTheFormatChunkDescribesMono16BitPCM() {
+        XCTAssertEqual(uint32(at: 16), 16, "PCM fmt chunks are 16 bytes")
+        XCTAssertEqual(uint16(at: 20), 1, "1 means uncompressed PCM")
+        XCTAssertEqual(uint16(at: 22), 1, "mono")
+        XCTAssertEqual(uint32(at: 24), UInt32(HoloClick.sampleRate))
+        XCTAssertEqual(uint16(at: 34), 16, "16 bits per sample")
+    }
+
+    func testTheDerivedRatesAgreeWithTheFormat() {
+        let blockAlign = uint16(at: 32)
+        XCTAssertEqual(blockAlign, 2, "mono 16-bit is two bytes per frame")
+        XCTAssertEqual(uint32(at: 28), UInt32(HoloClick.sampleRate) * UInt32(blockAlign))
+    }
+
+    func testTheDeclaredSizesMatchTheActualBytes() {
+        let dataSize = uint32(at: 40)
+        XCTAssertEqual(Int(dataSize), HoloClick.frameCount * 2)
+        XCTAssertEqual(data.count, HoloClick.headerByteCount + Int(dataSize))
+        // The RIFF size counts everything after its own field.
+        XCTAssertEqual(uint32(at: 4), UInt32(data.count - 8))
+    }
+
+    func testTheSamplesSurviveTheRoundTripToPCM() {
+        let source = HoloClick.waveform()
+        for (index, expected) in source.enumerated() {
+            let offset = HoloClick.headerByteCount + index * 2
+            let stored = Int16(bitPattern: uint16(at: offset))
+            XCTAssertEqual(
+                Float(stored) / 32_767, expected, accuracy: 0.001,
+                "sample \(index) should survive quantisation"
+            )
+        }
+    }
+}
+
 final class SoundPreferencesTests: XCTestCase {
     private static let keys = [SoundPreferences.effectsKey, SoundPreferences.spokenLaunchKey]
 

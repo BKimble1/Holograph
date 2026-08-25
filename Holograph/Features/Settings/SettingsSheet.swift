@@ -228,7 +228,7 @@ struct SettingsSheet: View {
         } header: {
             Text("Sound")
         } footer: {
-            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both follow the silent switch and never interrupt what you are already playing.")
+            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing.")
         }
     }
 

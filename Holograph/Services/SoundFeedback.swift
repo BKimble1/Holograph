@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 #if canImport(AVFoundation)
 import AVFoundation
 #endif
@@ -105,33 +106,86 @@ enum HoloClick {
         }
         return samples
     }
+
+    /// The same waveform as a self-contained 16-bit PCM WAV.
+    ///
+    /// Handing finished bytes to `AVAudioPlayer` is far less to go wrong than
+    /// wiring an engine graph for a 60 ms sound, and the file never touches
+    /// disk. Pure, so the container can be checked byte for byte in tests.
+    static func wavData() -> Data {
+        let samples = waveform()
+        let channels = 1
+        let bitsPerSample = 16
+        let bytesPerSample = bitsPerSample / 8
+        let byteRate = Int(sampleRate) * channels * bytesPerSample
+        let blockAlign = channels * bytesPerSample
+        let dataSize = samples.count * bytesPerSample
+
+        var data = Data(capacity: headerByteCount + dataSize)
+        func appendASCII(_ text: String) { data.append(contentsOf: Array(text.utf8)) }
+        func append32(_ value: Int) {
+            withUnsafeBytes(of: UInt32(truncatingIfNeeded: value).littleEndian) {
+                data.append(contentsOf: $0)
+            }
+        }
+        func append16(_ value: Int) {
+            withUnsafeBytes(of: UInt16(truncatingIfNeeded: value).littleEndian) {
+                data.append(contentsOf: $0)
+            }
+        }
+
+        appendASCII("RIFF")
+        append32(36 + dataSize)          // everything after this field
+        appendASCII("WAVE")
+        appendASCII("fmt ")
+        append32(16)                     // PCM fmt chunk size
+        append16(1)                      // format: uncompressed PCM
+        append16(channels)
+        append32(Int(sampleRate))
+        append32(byteRate)
+        append16(blockAlign)
+        append16(bitsPerSample)
+        appendASCII("data")
+        append32(dataSize)
+
+        for sample in samples {
+            let clamped = max(-1, min(1, sample))
+            append16(Int(Int16((clamped * 32_767).rounded())))
+        }
+        return data
+    }
+
+    /// RIFF + fmt + data headers, before any samples.
+    static let headerByteCount = 44
 }
 
 // MARK: - The real thing
 
 #if canImport(AVFoundation)
 
-/// Plays the tick through a single long-lived engine and speaks through
-/// `AVSpeechSynthesizer`.
+/// Plays the tick from an in-memory WAV and speaks through `AVSpeechSynthesizer`.
 ///
-/// Everything here is best-effort. The engine is built on first use, never
-/// during launch, and any failure leaves the launcher silent rather than
-/// broken.
+/// Everything here is best-effort: nothing is built during launch, and any
+/// failure leaves the launcher silent rather than broken.
 @MainActor
 final class SystemSound: SoundPlaying {
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
     private let synthesizer = AVSpeechSynthesizer()
+    private let logger = Logger(subsystem: "com.idlery.holograph", category: "sound")
 
-    private var clickBuffer: AVAudioPCMBuffer?
+    /// A small pool, so a quick flick through the carousel still sounds like one
+    /// tick per app instead of each one cutting off the last.
+    private var players: [AVAudioPlayer] = []
+    private var rotation = 0
+    private var buildAttempts = 0
     private var hasConfiguredSession = false
-    private var engineFailed = false
+
+    private static let poolSize = 3
+    private static let maximumBuildAttempts = 3
 
     func selectionTick() {
-        guard SoundPreferences.effectsEnabled, !engineFailed else { return }
-        guard let buffer = preparedBuffer() else { return }
-        player.scheduleBuffer(buffer, at: nil, options: .interrupts)
-        if !player.isPlaying { player.play() }
+        guard SoundPreferences.effectsEnabled, let player = availablePlayer() else { return }
+        player.currentTime = 0
+        player.play()
     }
 
     func announceLaunch(of name: String) {
@@ -158,63 +212,55 @@ final class SystemSound: SoundPlaying {
 
     // MARK: - Setup
 
-    /// Ambient and mixing: these are decorative sounds, so they respect the
-    /// silent switch and never interrupt whatever the user is already playing.
+    /// `.playback` rather than `.ambient`.
+    ///
+    /// Ambient audio is silenced by the Ring/Silent switch — on an iPad, the
+    /// toggle in Control Centre — which mutes the tick and the announcement
+    /// alike and looks exactly like the feature not working. These sounds are
+    /// asked for rather than incidental, and Settings carries a switch for each,
+    /// so they play on their own terms. `.mixWithOthers` keeps them from
+    /// interrupting anything already playing.
     private func configureSessionIfNeeded() {
         guard !hasConfiguredSession else { return }
         hasConfiguredSession = true
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setActive(true, options: [])
         } catch {
-            // Leaving the session alone still lets the engine run in most cases.
+            logger.error("audio session unavailable: \(error.localizedDescription, privacy: .public)")
         }
         #endif
     }
 
-    private func preparedBuffer() -> AVAudioPCMBuffer? {
-        if let clickBuffer, engine.isRunning { return clickBuffer }
+    private func availablePlayer() -> AVAudioPlayer? {
+        if players.isEmpty { buildPlayers() }
+        guard !players.isEmpty else { return nil }
+        // An idle player keeps overlapping ticks intact; otherwise take the next
+        // in rotation, which is the one that started longest ago.
+        if let idle = players.first(where: { !$0.isPlaying }) { return idle }
+        defer { rotation = (rotation + 1) % players.count }
+        return players[rotation]
+    }
+
+    private func buildPlayers() {
+        guard buildAttempts < Self.maximumBuildAttempts else { return }
+        buildAttempts += 1
         configureSessionIfNeeded()
 
-        let samples = HoloClick.waveform()
-        guard !samples.isEmpty,
-              let format = AVAudioFormat(
-                  standardFormatWithSampleRate: HoloClick.sampleRate,
-                  channels: 1
-              ),
-              let buffer = AVAudioPCMBuffer(
-                  pcmFormat: format,
-                  frameCapacity: AVAudioFrameCount(samples.count)
-              ),
-              let channel = buffer.floatChannelData?[0]
-        else {
-            engineFailed = true
-            return nil
-        }
-
-        for (index, sample) in samples.enumerated() { channel[index] = sample }
-        buffer.frameLength = AVAudioFrameCount(samples.count)
-
-        if player.engine == nil {
-            engine.attach(player)
-            engine.connect(player, to: engine.mainMixerNode, format: format)
-        }
-
-        // An interruption can stop the engine underneath us; starting it again
-        // on demand is cheaper than watching for every way that can happen.
-        if !engine.isRunning {
+        let data = HoloClick.wavData()
+        players = (0..<Self.poolSize).compactMap { _ in
             do {
-                try engine.start()
+                let player = try AVAudioPlayer(data: data, fileTypeHint: AVFileType.wav.rawValue)
+                player.volume = 0.9
+                player.prepareToPlay()
+                return player
             } catch {
-                engineFailed = true
+                logger.error("click unavailable: \(error.localizedDescription, privacy: .public)")
                 return nil
             }
         }
-
-        clickBuffer = buffer
-        return buffer
     }
 }
 

@@ -116,11 +116,18 @@ Two accents, both on by default and both switchable in Settings:
   same beat as the portal flourish. A refused launch cancels it, so the voice
   never contradicts the recovery alert.
 
-The audio session is `.ambient` and mixes with others, so both follow the silent
-switch and never interrupt what is already playing. The announcement is
-suppressed while VoiceOver is running, which is already describing the tap.
-Everything is best-effort: a device that cannot start an audio engine simply
-stays quiet.
+The session is `.playback` with `.mixWithOthers`. `.ambient` would be the politer
+category, but it is silenced by the Ring/Silent switch — the Control Centre
+toggle on an iPad — which mutes both sounds and looks exactly like the feature
+being broken. These are sounds the user asked for and can switch off in
+Settings, so they play on their own terms while still never interrupting
+anything already playing. The announcement is suppressed while VoiceOver is
+running, which is already describing the tap.
+
+The tick reaches `AVAudioPlayer` as a self-contained WAV built in memory by
+`HoloClick.wavData()` — finished bytes are far less to go wrong than an engine
+graph for a 60 ms sound, and the container is checked byte for byte in tests.
+Everything is best-effort: a device that cannot play simply stays quiet.
 
 ---
 

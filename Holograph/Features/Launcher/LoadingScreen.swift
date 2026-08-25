@@ -12,13 +12,27 @@ struct LoadingScreen: View {
     @State private var hasAppeared = false
 
     var body: some View {
+        // Backdrop outside the GeometryReader, for the same reason as the
+        // launcher: inside one there is no safe-area inset left to expand into.
+        ZStack {
+            HoloBackgroundView()
+            content
+        }
+        .background(HoloTheme.backgroundDeep.ignoresSafeArea())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Holograph is starting")
+        .accessibilityIdentifier(AccessibilityID.loadingScreen)
+        .onAppear {
+            withAnimation(entrance) { hasAppeared = true }
+        }
+    }
+
+    private var content: some View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let logoSize = min(max(side * 0.36, 168), 420)
 
             ZStack {
-                HoloBackgroundView()
-
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     mark(size: logoSize)
@@ -33,18 +47,6 @@ struct LoadingScreen: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-        }
-        .background(HoloTheme.backgroundDeep)
-        .ignoresSafeArea(edges: .top)
-        // Element first, then describe it. Applied the other way round the
-        // identifier has no element to land on yet, so it propagates to every
-        // descendant and stamps itself over the credit's own identifier — which
-        // is exactly why the credit could be photographed but never found.
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Holograph is starting")
-        .accessibilityIdentifier(AccessibilityID.loadingScreen)
-        .onAppear {
-            withAnimation(entrance) { hasAppeared = true }
         }
     }
 

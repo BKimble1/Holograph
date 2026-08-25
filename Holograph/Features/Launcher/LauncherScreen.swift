@@ -11,20 +11,29 @@ struct LauncherScreen: View {
     @FocusState private var isStageFocused: Bool
 
     var body: some View {
-        GeometryReader { proxy in
-            let layout = LauncherLayout(size: proxy.size)
+        // The backdrop is a sibling of the stage rather than a layer inside it.
+        // A GeometryReader is laid out *within* the safe area and then pinned to
+        // proxy.size, so anything inside it has no inset left to expand into —
+        // `ignoresSafeArea` there does nothing and the glow ends on a hard line
+        // along the top edge. Out here it bleeds to the physical edges, while
+        // the stage and its controls keep their safe-area geometry.
+        ZStack {
+            HoloBackgroundView()
 
-            ZStack {
-                HoloBackgroundView()
-                stage(layout: layout)
-                settingsButton
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, layout.isCompact ? 16 : 26)
-                    .padding(.top, layout.isCompact ? 12 : 18)
+            GeometryReader { proxy in
+                let layout = LauncherLayout(size: proxy.size)
+
+                ZStack {
+                    stage(layout: layout)
+                    settingsButton
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(.trailing, layout.isCompact ? 16 : 26)
+                        .padding(.top, layout.isCompact ? 12 : 18)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
             }
-            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .background(HoloTheme.backgroundDeep)
+        .background(HoloTheme.backgroundDeep.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .focusable()
         .focusEffectDisabled()
