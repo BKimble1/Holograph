@@ -37,6 +37,11 @@ final class AppServices {
 ///
 /// This is the only place that decides "real store or in-memory", "real
 /// launcher or stub" — the rest of the app just uses what it is handed.
+///
+/// Note what this deliberately does *not* do: it never touches the library and
+/// never rasterises anything. `App.init()` runs before the scene exists, and
+/// rendering SwiftUI content there can deadlock. Seeding and the first load
+/// happen from `prepareLibrary()`, which the root view calls in a `task`.
 @MainActor
 struct AppComposition {
     let services: AppServices
@@ -45,6 +50,8 @@ struct AppComposition {
     /// `true` when the on-disk store could not be opened and we fell back to
     /// memory, so the UI can say so instead of silently losing data.
     let didFallBackToMemory: Bool
+    /// Applied once the scene is up, not during `App.init()`.
+    let pendingSeed: LaunchEnvironment.SeedKind
 
     static func make(environment: LaunchEnvironment) -> AppComposition {
         let containerResult = ModelContainerFactory.make(inMemory: environment.store == .inMemory)
@@ -74,8 +81,6 @@ struct AppComposition {
 
         let motion = HoloMotion(isDisabledForTesting: environment.animationsDisabled)
 
-        applySeed(environment.seed, to: repository)
-
         let model = LauncherViewModel(
             repository: repository,
             launcher: launcher,
@@ -83,14 +88,21 @@ struct AppComposition {
             selectionStore: selectionStore,
             motion: motion
         )
-        model.load()
 
         return AppComposition(
             services: services,
             motion: motion,
             model: model,
-            didFallBackToMemory: containerResult.didFallBackToMemory
+            didFallBackToMemory: containerResult.didFallBackToMemory,
+            pendingSeed: environment.seed
         )
+    }
+
+    /// Applies the launch-argument seed, if any, and performs the first load.
+    /// Safe to call more than once; the caller guards it with a flag.
+    func prepareLibrary() {
+        Self.applySeed(pendingSeed, to: services.repository)
+        model.load()
     }
 
     private static func applySeed(_ seed: LaunchEnvironment.SeedKind, to repository: LauncherRepository) {

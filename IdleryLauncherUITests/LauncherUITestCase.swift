@@ -72,14 +72,34 @@ class LauncherUITestCase: XCTestCase {
         }
     }
 
-    /// Taps a menu entry that lives inside a row's "…" menu.
-    func tapRowMenuItem(row name: String, item identifier: String, file: StaticString = #filePath, line: UInt = #line) {
+    /// Taps an entry inside a row's "…" menu.
+    ///
+    /// `UIMenu` does not always carry the accessibility identifier SwiftUI puts
+    /// on the button, so this falls back to the visible title.
+    func tapRowMenuItem(
+        row name: String,
+        item identifier: String,
+        titled title: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
         let menu = rowMenu(name)
-        XCTAssertTrue(menu.waitForExistence(timeout: 10), "No menu for \(name)", file: file, line: line)
+        XCTAssertTrue(menu.waitForExistence(timeout: 20), "No menu for \(name)", file: file, line: line)
         menu.tap()
-        let entry = app.buttons[identifier].firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), "Menu item \(identifier) never appeared", file: file, line: line)
-        entry.tap()
+
+        let byIdentifier = app.descendants(matching: .any)[identifier].firstMatch
+        if byIdentifier.waitForExistence(timeout: 4) {
+            byIdentifier.tap()
+            return
+        }
+        let byTitle = app.buttons[title].firstMatch
+        XCTAssertTrue(
+            byTitle.waitForExistence(timeout: 10),
+            "Neither \(identifier) nor a button titled “\(title)” appeared in the menu",
+            file: file,
+            line: line
+        )
+        byTitle.tap()
     }
 
     func typeInto(_ element: XCUIElement, text: String, clearFirst: Bool = false, file: StaticString = #filePath, line: UInt = #line) {

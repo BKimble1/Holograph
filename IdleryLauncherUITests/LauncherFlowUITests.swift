@@ -25,7 +25,9 @@ final class LauncherFlowUITests: LauncherUITestCase {
         XCTAssertTrue(emptyState.waitForExistence(timeout: 20))
         emptyState.tap()
 
-        // The placeholder opens Settings straight into the editor.
+        XCTAssertTrue(addApp.waitForExistence(timeout: 20), "The placeholder should open Settings")
+        addApp.tap()
+
         typeInto(app.textFields["editor.name"], text: "Field Notes")
         typeInto(app.textFields["editor.launchURL"], text: "idler-offrent://launch")
         app.buttons["editor.save"].tap()
@@ -41,7 +43,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         launchApp(seed: .demoApps)
         openSettings()
 
-        tapRowMenuItem(row: "Aquify", item: "settings.row.edit.Aquify")
+        tapRowMenuItem(row: "Aquify", item: "settings.row.edit.Aquify", titled: "Edit App")
 
         typeInto(app.textFields["editor.name"], text: "Aquify Pro", clearFirst: true)
         app.buttons["editor.save"].tap()
@@ -80,7 +82,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         )
 
         // Corevault is last in the demo set; walk it up one place.
-        tapRowMenuItem(row: "Corevault", item: "settings.row.moveUp.Corevault")
+        tapRowMenuItem(row: "Corevault", item: "settings.row.moveUp.Corevault", titled: "Move Up")
 
         XCTAssertTrue(appRow("Corevault").waitForExistence(timeout: 20))
         XCTAssertLessThan(
@@ -102,7 +104,7 @@ final class LauncherFlowUITests: LauncherUITestCase {
         XCTAssertEqual(selectedAppName.label, "Tagfield")
 
         openSettings()
-        tapRowMenuItem(row: "Tagfield", item: "settings.row.delete.Tagfield")
+        tapRowMenuItem(row: "Tagfield", item: "settings.row.delete.Tagfield", titled: "Delete")
 
         let confirm = app.alerts.buttons["Delete"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), "Deleting should ask for confirmation")

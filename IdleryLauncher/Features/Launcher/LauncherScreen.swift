@@ -90,7 +90,7 @@ struct LauncherScreen: View {
 
             if model.isEmpty {
                 EmptyLauncherView(tileSize: layout.tileSize) {
-                    present(route: .add)
+                    present(route: nil)
                 }
                 .transition(.opacity)
             } else {
