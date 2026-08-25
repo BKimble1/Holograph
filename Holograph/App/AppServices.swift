@@ -60,7 +60,7 @@ struct AppComposition {
 
         switch ModelContainerFactory.make(inMemory: wantsMemoryStore) {
         case .ready(let container):
-            repository = SwiftDataLauncherRepository(context: container.mainContext)
+            repository = SwiftDataLauncherRepository(container: container)
             storageDegraded = false
         case .unavailable:
             // Nothing will persist, but the launcher still opens and works for

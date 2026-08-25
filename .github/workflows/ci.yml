@@ -282,6 +282,10 @@ jobs:
           count = 0
           entries = json.loads(manifest.read_text())
           print("manifest keys:", sorted({k for e in entries for k in e}))
+          # Show one entry verbatim so a naming mismatch is visible rather than
+          # silently producing nothing.
+          if entries:
+              print("first entry:", json.dumps(entries[0])[:1200])
           for test in entries:
               for attachment in test.get("attachments", []):
                   exported = attachment.get("exportedFileName")

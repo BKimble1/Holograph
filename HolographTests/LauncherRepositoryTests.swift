@@ -10,7 +10,7 @@ final class LauncherRepositoryTests: XCTestCase {
         let container = try makeContainer()
         return [
             ("in-memory", InMemoryLauncherRepository()),
-            ("SwiftData", SwiftDataLauncherRepository(context: container.mainContext))
+            ("SwiftData", SwiftDataLauncherRepository(container: container))
         ]
     }
 
@@ -147,7 +147,9 @@ final class LauncherRepositoryTests: XCTestCase {
     }
 
     func testUnreadableLaunchURLIsSkippedRatherThanCrashing() throws {
-        let context = try makeContainer().mainContext
+        // The container has to outlive the fetch, so hold it explicitly.
+        let container = try makeContainer()
+        let context = container.mainContext
         context.insert(
             StoredLauncherApp(name: "Broken", launchURLString: "", sortOrder: 0)
         )
@@ -156,7 +158,7 @@ final class LauncherRepositoryTests: XCTestCase {
         )
         try context.save()
 
-        let repository = SwiftDataLauncherRepository(context: context)
+        let repository = SwiftDataLauncherRepository(container: container)
         XCTAssertEqual(try repository.fetchAll().map(\.name), ["Fine"])
     }
 }

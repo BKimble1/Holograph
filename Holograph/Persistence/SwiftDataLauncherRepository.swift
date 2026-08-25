@@ -3,11 +3,16 @@ import SwiftData
 
 @MainActor
 final class SwiftDataLauncherRepository: LauncherRepository {
+    /// Held for the repository's lifetime. A `ModelContext` on its own is not
+    /// enough — once the container it came from is released, SwiftData has no
+    /// active container for the model and traps on the next fetch.
+    private let container: ModelContainer
     private let context: ModelContext
     private let now: @Sendable () -> Date
 
-    init(context: ModelContext, now: @escaping @Sendable () -> Date = { .now }) {
-        self.context = context
+    init(container: ModelContainer, now: @escaping @Sendable () -> Date = { .now }) {
+        self.container = container
+        self.context = container.mainContext
         self.now = now
     }
 
