@@ -164,16 +164,16 @@ struct CalibrationRunView: View {
                     .accessibilityIdentifier(AccessibilityID.calibrationDetail)
             }
             .frame(height: 84)
-        case .done(let message):
-            message(message, symbol: "checkmark.circle.fill", tint: HoloTheme.cyanBright)
+        case .done(let text):
+            outcome(text, symbol: "checkmark.circle.fill", tint: HoloTheme.cyanBright)
                 .accessibilityIdentifier(AccessibilityID.calibrationResult)
-        case .failed(let message):
-            message(message, symbol: "exclamationmark.triangle.fill", tint: .orange)
+        case .failed(let text):
+            outcome(text, symbol: "exclamationmark.triangle.fill", tint: .orange)
                 .accessibilityIdentifier(AccessibilityID.calibrationResult)
         }
     }
 
-    private func message(_ text: String, symbol: String, tint: Color) -> some View {
+    private func outcome(_ text: String, symbol: String, tint: Color) -> some View {
         VStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.title2)
