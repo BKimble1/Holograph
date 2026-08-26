@@ -15,7 +15,10 @@ final class InMemoryLauncherRepository: LauncherRepository {
         renumber()
     }
 
-    func fetchAll() throws -> [LauncherItem] { items }
+    /// Sorted on the way out, exactly as the SwiftData store does. Order is a
+    /// property of the read rather than of the array, which is what lets each
+    /// scope number itself independently.
+    func fetchAll() throws -> [LauncherItem] { items.sortedForDisplay() }
 
     @discardableResult
     func add(_ draft: LauncherItemDraft) throws -> LauncherItem {

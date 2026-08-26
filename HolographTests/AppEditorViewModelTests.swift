@@ -18,7 +18,9 @@ final class AppEditorViewModelTests: XCTestCase {
         let editor = makeEditor()
 
         XCTAssertFalse(editor.isEditing)
-        XCTAssertEqual(editor.title, "Add App")
+        // One editor now makes apps and websites, so the title says what the
+        // screen is for rather than naming one of them.
+        XCTAssertEqual(editor.title, "Add to Holograph")
         XCTAssertEqual(editor.name, "")
         XCTAssertNil(editor.iconData)
         XCTAssertFalse(editor.canSave)

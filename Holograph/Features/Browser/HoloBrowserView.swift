@@ -38,6 +38,13 @@ final class HoloBrowserModel {
     }
 
     var title: String {
+        // Before a page has loaded there is no title and often no host either,
+        // and "https://" in the bar looks like something went wrong. The tile's
+        // own name is the honest thing to show until the page says otherwise.
+        if pageTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+           currentURL?.host()?.isEmpty != false {
+            return item.name
+        }
         let resolved = HoloBrowserPolicy.title(for: currentURL, pageTitle: pageTitle)
         return resolved.isEmpty ? item.name : resolved
     }
