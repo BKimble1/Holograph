@@ -138,7 +138,9 @@ final class FolderStageTests: XCTestCase {
 
         XCTAssertTrue(harness.model.items.contains { $0.name == "Mail" }, "still on the wall")
         XCTAssertEqual(harness.model.children(of: folder.id).map(\.name), ["Notes", "Idlery", "Mail"])
-        XCTAssertEqual(harness.model.folderName(containing: mail), "Work")
+        // Re-read rather than reusing the copy taken before the change.
+        let updated = harness.model.allItems.first { $0.id == mail.id }!
+        XCTAssertEqual(harness.model.folderName(containing: updated), "Work")
     }
 }
 

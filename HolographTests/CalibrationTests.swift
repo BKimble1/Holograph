@@ -6,36 +6,46 @@ import XCTest
 /// microphone, no hardware of any kind.
 final class HandCalibratorTests: XCTestCase {
     private let frameRate = 30.0
-    /// A hand is about three inches across the knuckles, so a span is an inch
-    /// and a half of travel... in spans.
-    private func flick(
-        into calibrator: inout HandCalibrator,
-        spans: Double,
-        over duration: TimeInterval,
-        from time: TimeInterval
-    ) -> TimeInterval {
-        var now = time
-        let steps = max(2, Int(duration * frameRate))
-        // Positions are handed over as (x, span) with span 1, so x is spans.
-        for step in 0...steps {
-            let progress = Double(step) / Double(steps)
-            calibrator.handSeen(HandReading(x: spans * progress, span: 1), at: now)
-            now += duration / Double(steps)
+
+    /// A hand, flicking. Position carries forward between flicks and the
+    /// direction alternates, because that is what a hand actually does — it
+    /// does not teleport back to where it started for the next one.
+    private struct Hand {
+        var x = 0.0
+        var time: TimeInterval = 100
+        var goingRight = true
+
+        mutating func flick(
+            _ calibrator: inout HandCalibrator,
+            spans: Double,
+            over duration: TimeInterval,
+            frameRate: Double
+        ) {
+            let start = x
+            let travel = goingRight ? spans : -spans
+            goingRight.toggle()
+            let steps = max(2, Int(duration * frameRate))
+            // Positions are handed over as (x, span) with span 1, so x is spans.
+            for step in 0...steps {
+                let progress = Double(step) / Double(steps)
+                calibrator.handSeen(HandReading(x: start + travel * progress, span: 1), at: time)
+                time += duration / Double(steps)
+            }
+            x = start + travel
+            // And then it stops, which is what closes the stroke.
+            for _ in 0..<8 {
+                calibrator.handSeen(HandReading(x: x, span: 1), at: time)
+                time += 1 / frameRate
+            }
         }
-        // And then it stops, which is what closes the stroke.
-        for _ in 0..<6 {
-            calibrator.handSeen(HandReading(x: spans, span: 1), at: now)
-            now += 1 / frameRate
-        }
-        return now
     }
 
     func testThreeFlicksAreEnough() {
         var calibrator = HandCalibrator()
-        var time: TimeInterval = 100
+        var hand = Hand()
         XCTAssertFalse(calibrator.isComplete)
         for _ in 0..<3 {
-            time = flick(into: &calibrator, spans: 2.0, over: 0.30, from: time)
+            hand.flick(&calibrator, spans: 2.0, over: 0.30, frameRate: frameRate)
         }
         XCTAssertTrue(calibrator.isComplete)
         XCTAssertEqual(calibrator.flicks.count, 3)
@@ -44,8 +54,8 @@ final class HandCalibratorTests: XCTestCase {
 
     func testItRefusesToGuessFromTooLittle() {
         var calibrator = HandCalibrator()
-        var time: TimeInterval = 100
-        time = flick(into: &calibrator, spans: 2.0, over: 0.30, from: time)
+        var hand = Hand()
+        hand.flick(&calibrator, spans: 2.0, over: 0.30, frameRate: frameRate)
         XCTAssertNil(calibrator.result(), "one flick is not a measurement")
     }
 
@@ -53,9 +63,9 @@ final class HandCalibratorTests: XCTestCase {
         // The point of calibrating: a threshold set *at* what somebody managed
         // three times in a row would fail on the fourth.
         var calibrator = HandCalibrator()
-        var time: TimeInterval = 100
+        var hand = Hand()
         for _ in 0..<3 {
-            time = flick(into: &calibrator, spans: 2.0, over: 0.30, from: time)
+            hand.flick(&calibrator, spans: 2.0, over: 0.30, frameRate: frameRate)
         }
         guard let result = calibrator.result() else { return XCTFail("no result") }
         let peak = HandCalibrator.median(calibrator.flicks.map(\.peakSpeed))
@@ -71,11 +81,11 @@ final class HandCalibratorTests: XCTestCase {
         // reason this exists.
         var big = HandCalibrator()
         var small = HandCalibrator()
-        var t1: TimeInterval = 100
-        var t2: TimeInterval = 100
+        var bigHand = Hand()
+        var smallHand = Hand()
         for _ in 0..<3 {
-            t1 = flick(into: &big, spans: 4.0, over: 0.30, from: t1)
-            t2 = flick(into: &small, spans: 1.2, over: 0.30, from: t2)
+            bigHand.flick(&big, spans: 4.0, over: 0.30, frameRate: frameRate)
+            smallHand.flick(&small, spans: 1.2, over: 0.30, frameRate: frameRate)
         }
         guard let bigResult = big.result(), let smallResult = small.result() else {
             return XCTFail("both should measure")
@@ -86,9 +96,9 @@ final class HandCalibratorTests: XCTestCase {
 
     func testATwitchIsNotAFlick() {
         var calibrator = HandCalibrator()
-        var time: TimeInterval = 100
+        var hand = Hand()
         for _ in 0..<5 {
-            time = flick(into: &calibrator, spans: 0.15, over: 0.10, from: time)
+            hand.flick(&calibrator, spans: 0.15, over: 0.10, frameRate: frameRate)
         }
         XCTAssertTrue(calibrator.flicks.isEmpty, "a twitch is not somebody trying to flick")
     }
@@ -106,15 +116,21 @@ final class HandCalibratorTests: XCTestCase {
 
     func testTheMedianIgnoresOneBadAttempt() {
         // Three flicks, one of them wild. The answer should look like the two
-        // ordinary ones.
+        // ordinary ones — which is the whole reason this takes a median.
         var calibrator = HandCalibrator()
-        var time: TimeInterval = 100
-        time = flick(into: &calibrator, spans: 2.0, over: 0.30, from: time)
-        time = flick(into: &calibrator, spans: 9.0, over: 0.30, from: time)
-        time = flick(into: &calibrator, spans: 2.1, over: 0.30, from: time)
+        var hand = Hand()
+        hand.flick(&calibrator, spans: 2.0, over: 0.30, frameRate: frameRate)
+        hand.flick(&calibrator, spans: 9.0, over: 0.30, frameRate: frameRate)
+        hand.flick(&calibrator, spans: 2.1, over: 0.30, frameRate: frameRate)
 
         guard let result = calibrator.result() else { return XCTFail("no result") }
-        XCTAssertLessThan(result.travelSpans, 2.0, "the wild one should not drag the answer")
+        let travels = calibrator.flicks.map(\.travel).sorted()
+        XCTAssertEqual(travels.count, 3)
+        XCTAssertLessThan(
+            result.travelSpans, travels[2] * 0.55,
+            "the wild one should not be what the answer is built from"
+        )
+        XCTAssertLessThan(result.travelSpans, 2.0)
     }
 }
 

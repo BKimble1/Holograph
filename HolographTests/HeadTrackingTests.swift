@@ -42,10 +42,18 @@ final class HeadTrackerTests: XCTestCase {
     }
 
     func testASmallShiftIsInsideTheDeadZone() {
-        let thresholds = HeadTracker.Thresholds()
-        // A shift of one per cent of the frame is somebody breathing.
-        let (_, perspective) = settled(at: 0.01)
-        XCTAssertEqual(perspective.x, 0, accuracy: 0.001, "\(thresholds.deadZone) dead zone should absorb this")
+        // Half a per cent of the frame is somebody breathing.
+        let (_, perspective) = settled(at: 0.004)
+        XCTAssertEqual(perspective.x, 0, accuracy: 0.001, "the dead zone should absorb this")
+    }
+
+    func testAnOrdinaryShiftOfTheHeadIsFeltProperly() {
+        // The first device test said the effect was too small to read as depth.
+        // The range is what decides that: a shift a person actually makes while
+        // looking around their own screen has to reach most of the effect, not
+        // a tenth of it.
+        let (_, perspective) = settled(at: 0.12)
+        XCTAssertGreaterThan(perspective.x, 0.6, "an ordinary lean should be most of the way")
     }
 
     func testLeaningOneWayMovesTheSceneThatWay() {
