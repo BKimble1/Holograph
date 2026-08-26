@@ -11,6 +11,7 @@ struct LauncherScreen: View {
     @State private var isSettingsPresented = false
     @FocusState private var isStageFocused: Bool
     @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
+    @AppStorage(ClapPreferences.enabledKey) private var clapToOpenEnabled = false
 
     var body: some View {
         // The backdrop is a sibling of the stage rather than a layer inside it.
@@ -45,13 +46,17 @@ struct LauncherScreen: View {
         .onKeyPress(.return) { activateSelected(); return .handled }
         .onKeyPress(.space) { activateSelected(); return .handled }
         .onAppear { isStageFocused = true }
-        // The camera runs only while the launcher is on screen, switched on, and
-        // the scene is active — never behind Settings, and never in the
-        // background.
+        // The camera and the microphone run only while the launcher is on
+        // screen, switched on, and the scene is active — never behind Settings,
+        // and never in the background.
         .onChange(of: airGesturesEnabled, initial: true) { _, _ in updateAirGestures() }
-        .onChange(of: motion.isSceneActive) { _, _ in updateAirGestures() }
-        .onChange(of: isSettingsPresented) { _, _ in updateAirGestures() }
-        .onDisappear { services.airGestures.stop() }
+        .onChange(of: clapToOpenEnabled, initial: true) { _, _ in updateClapListening() }
+        .onChange(of: motion.isSceneActive) { _, _ in updateAmbientInput() }
+        .onChange(of: isSettingsPresented) { _, _ in updateAmbientInput() }
+        .onDisappear {
+            services.airGestures.stop()
+            services.claps.stop()
+        }
         .sheet(isPresented: $isSettingsPresented, onDismiss: { settingsRoute = nil }) {
             SettingsSheet(initialRoute: settingsRoute)
                 .environment(model)
@@ -203,9 +208,18 @@ struct LauncherScreen: View {
         )
     }
 
+    private func updateAmbientInput() {
+        updateAirGestures()
+        updateClapListening()
+    }
+
+    /// Whether the launcher is in a position to be watching or listening at all.
+    private var isForeground: Bool {
+        motion.isSceneActive && !isSettingsPresented
+    }
+
     private func updateAirGestures() {
-        let shouldWatch = airGesturesEnabled && motion.isSceneActive && !isSettingsPresented
-        guard shouldWatch else {
+        guard airGesturesEnabled, isForeground else {
             services.airGestures.stop()
             return
         }
@@ -216,24 +230,32 @@ struct LauncherScreen: View {
         let motion = motion
         services.airGestures.onGesture = { gesture in
             guard !model.isEmpty else { return }
-            switch gesture {
-            case .swipe(let direction):
-                // The wall moves the way the hand went, which is how a swipe on
-                // the glass already behaves: push the apps left and the next one
-                // arrives from the right.
-                withAnimation(motion.transition) {
-                    switch direction {
-                    case .left: model.selectNext()
-                    case .right: model.selectPrevious()
-                    }
+            // Flicks and drags both come through `selectionStep`, so there is
+            // exactly one place that decides which way a hand sends the wall.
+            withAnimation(motion.transition) {
+                if gesture.selectionStep < 0 {
+                    model.selectPrevious()
+                } else {
+                    model.selectNext()
                 }
-            case .burst:
-                // Fingers thrown open: the same thing tapping the centred tile
-                // does, ceremony and all.
-                Task { await model.launchSelected() }
             }
         }
         services.airGestures.start()
+    }
+
+    private func updateClapListening() {
+        guard clapToOpenEnabled, isForeground else {
+            services.claps.stop()
+            return
+        }
+
+        let model = model
+        services.claps.onDoubleClap = {
+            guard !model.isEmpty else { return }
+            // The same thing tapping the centred tile does, ceremony and all.
+            Task { await model.launchSelected() }
+        }
+        services.claps.start()
     }
 
     private func moveSelection(by delta: Int) {

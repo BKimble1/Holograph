@@ -17,6 +17,11 @@ final class AirGestureDetectorTests: XCTestCase {
     private static let inch = span / 3.0
     private static let frameRate = 18.0
 
+    /// Fingertip spreads a real hand reads at, in spans. Pinched fingertips sit
+    /// about this far from their own centre; a splayed hand about 0.69.
+    private static let pinched = 0.13
+    private static let openHand = 0.45
+
     /// Plays a hand through the detector, carrying position and time forward the
     /// way a real one does, and jittering every reading.
     private struct Hand {
@@ -37,7 +42,11 @@ final class AirGestureDetectorTests: XCTestCase {
             rest(for: 0.3)
         }
 
-        mutating func move(_ inches: Double, over duration: TimeInterval, spread: Double? = 0.2) {
+        mutating func move(
+            _ inches: Double,
+            over duration: TimeInterval,
+            spread: Double? = AirGestureDetectorTests.openHand
+        ) {
             let steps = max(1, Int((duration * AirGestureDetectorTests.frameRate).rounded()))
             let start = x
             for step in 1...steps {
@@ -52,17 +61,27 @@ final class AirGestureDetectorTests: XCTestCase {
             }
         }
 
-        mutating func rest(for duration: TimeInterval, spread: Double? = 0.2) {
+        mutating func rest(
+            for duration: TimeInterval,
+            spread: Double? = AirGestureDetectorTests.openHand
+        ) {
             move(0, over: duration, spread: spread)
         }
 
-        /// Feeds a sequence of fingertip spreads with the hand held still.
-        mutating func openingFingers(_ series: [Double], step: TimeInterval = 0.06) {
-            for spread in series {
-                time += step
-                let reading = HandReading(x: x, span: AirGestureDetectorTests.span, spread: spread)
-                if let gesture = detector.handSeen(reading, time: time) { fired.append(gesture) }
-            }
+        /// Brings the fingertips together and holds long enough for the drag to
+        /// take hold.
+        mutating func pinch() {
+            rest(for: 0.25, spread: AirGestureDetectorTests.pinched)
+        }
+
+        /// Moves with the fingers still together.
+        mutating func sweep(_ inches: Double, over duration: TimeInterval) {
+            move(inches, over: duration, spread: AirGestureDetectorTests.pinched)
+        }
+
+        /// Opens the hand again.
+        mutating func release() {
+            rest(for: 0.2, spread: 0.66)
         }
     }
 
@@ -78,13 +97,28 @@ final class AirGestureDetectorTests: XCTestCase {
         }
     }
 
+    // MARK: - Which way the wall goes
+
+    func testTheWallMovesAgainstTheHand() {
+        // Push the hand left and the apps come from the left, as though the wall
+        // were being shoved along — the opposite of dragging on glass, and what
+        // was asked for.
+        XCTAssertEqual(AirSwipe.left.selectionStep, -1)
+        XCTAssertEqual(AirSwipe.right.selectionStep, 1)
+    }
+
+    func testAFlickAndADragAgreeOnDirection() {
+        // One mapping, used by both, so they can never drift apart.
+        XCTAssertEqual(AirGesture.swipe(.left).selectionStep, AirGesture.drag(.left).selectionStep)
+        XCTAssertEqual(AirGesture.swipe(.right).selectionStep, AirGesture.drag(.right).selectionStep)
+    }
+
     // MARK: - Flicks that should register
 
     func testFlicksOfEverySizeRegister() {
         // The complaint was that it rarely moved. Everything from a short flick
         // to a full arm sweep has to work. These sizes were each measured over
-        // two hundred noise realisations before being written down here; every
-        // one of them registers every time.
+        // two hundred noise realisations before being written down here.
         for (inches, duration) in [(3.0, 0.25), (4.0, 0.30), (6.0, 0.30), (10.0, 0.40), (16.0, 0.60)] {
             var hand = Hand()
             hand.move(inches, over: duration)
@@ -107,6 +141,14 @@ final class AirGestureDetectorTests: XCTestCase {
         var hand = Hand()
         hand.move(-6, over: 0.30)
         XCTAssertEqual(hand.fired, [.swipe(.left)])
+    }
+
+    func testAFlickWithALooselyClosedHandIsStillAFlick() {
+        // Not everyone flicks with an open palm, and a half-closed hand must not
+        // be mistaken for the pinch that starts a drag.
+        var hand = Hand()
+        hand.move(6, over: 0.30, spread: 0.30)
+        XCTAssertEqual(hand.fired, [.swipe(.right)])
     }
 
     // MARK: - Exactly once
@@ -140,20 +182,41 @@ final class AirGestureDetectorTests: XCTestCase {
         XCTAssertEqual(hand.fired.count, 1)
     }
 
-    // MARK: - Deliberate repeats
+    // MARK: - The settling pause
 
-    func testFlickingAgainAfterAPauseWorks() {
+    func testASecondFlickTooSoonIsIgnored() {
+        // The pause is the point: it is there so the hand can be brought back
+        // and set up again without any of that counting.
         var hand = Hand()
         hand.move(6, over: 0.30)
-        hand.rest(for: 0.35)
+        hand.rest(for: 0.4)
+        hand.move(6, over: 0.30)
+        XCTAssertEqual(hand.fired, [.swipe(.right)])
+    }
+
+    func testFlickingAgainAfterTheSettlingPauseWorks() {
+        var hand = Hand()
+        hand.move(6, over: 0.30)
+        hand.rest(for: 1.25)
         hand.move(6, over: 0.30)
         XCTAssertEqual(hand.fired, [.swipe(.right), .swipe(.right)])
     }
 
-    func testReversingAfterAPauseWorks() {
+    func testTheReturnStrokeCountsTowardsTheSettlingPause() {
+        // The pause runs from the flick, not from the moment the hand stops, so
+        // bringing it back is not dead time on top of the wait.
         var hand = Hand()
         hand.move(6, over: 0.30)
-        hand.rest(for: 0.35)
+        hand.move(-6, over: 0.35)
+        hand.rest(for: 0.9)
+        hand.move(6, over: 0.30)
+        XCTAssertEqual(hand.fired, [.swipe(.right), .swipe(.right)])
+    }
+
+    func testReversingAfterTheSettlingPauseWorks() {
+        var hand = Hand()
+        hand.move(6, over: 0.30)
+        hand.rest(for: 1.25)
         hand.move(-6, over: 0.30)
         XCTAssertEqual(hand.fired, [.swipe(.right), .swipe(.left)])
     }
@@ -162,9 +225,15 @@ final class AirGestureDetectorTests: XCTestCase {
         var hand = Hand()
         for _ in 0..<3 {
             hand.move(6, over: 0.30)
-            hand.rest(for: 0.30)
+            hand.rest(for: 1.25)
         }
         XCTAssertEqual(hand.fired.count, 3)
+    }
+
+    func testTheDefaultPauseIsLongEnoughToRepositionAndShortEnoughToUse() {
+        let settle = AirGestureDetector.Thresholds.default.settleAfterSwipe
+        XCTAssertGreaterThan(settle, 0.8, "a return stroke and a breath take about this long")
+        XCTAssertLessThanOrEqual(settle, 1.5, "beyond this the launcher feels stuck")
     }
 
     // MARK: - Silence
@@ -226,49 +295,97 @@ final class AirGestureDetectorTests: XCTestCase {
         )
     }
 
-    // MARK: - The burst
-    //
-    // Spreads are what a hand actually reads: fingertips pinched together sit
-    // about 0.13 spans from their own centre, and a fully splayed hand about
-    // 0.69. An early version asked for 1.0, which no hand reaches — so it never
-    // fired once.
+    // MARK: - Pinch to drag
 
-    func testFingersThrownOpenIsABurst() {
+    func testPinchedFingersDragTheWallAlong() {
+        // Six inches of hand is about three apps, so a foot is six — and the
+        // count is what makes this feel like carrying the wall rather than
+        // nudging it.
         var hand = Hand()
-        hand.openingFingers([0.15, 0.18, 0.30, 0.48, 0.62])
-        XCTAssertEqual(hand.fired, [.burst])
+        hand.pinch()
+        hand.sweep(12, over: 1.5)
+        XCTAssertEqual(hand.fired, Array(repeating: .drag(.right), count: 6))
     }
 
-    func testABurstIsFoundEvenWhenThePinchWasNeverSeenClearly() {
-        // Gathered fingertips overlap, which is the pose Vision is least sure
-        // about, so the first spread that can be read is often already opening.
+    func testDraggingTheOtherWayGoesTheOtherWay() {
         var hand = Hand()
-        hand.openingFingers([0.40, 0.44, 0.55, 0.66])
-        XCTAssertEqual(hand.fired, [.burst])
+        hand.pinch()
+        hand.sweep(-12, over: 1.5)
+        XCTAssertEqual(hand.fired, Array(repeating: .drag(.left), count: 6))
     }
 
-    func testAHandHeldOpenDoesNotKeepLaunchingThings() {
-        var detector = AirGestureDetector()
-        var fired: [AirGesture] = []
-        for step in 0..<12 {
-            let reading = HandReading(x: 0, span: 0.24, spread: 0.66)
-            if let gesture = detector.handSeen(reading, time: 100 + Double(step) * 0.06) {
-                fired.append(gesture)
-            }
-        }
-        XCTAssertTrue(fired.isEmpty)
+    func testADragCanChangeItsMindWithoutLettingGo() {
+        var hand = Hand()
+        hand.pinch()
+        hand.sweep(6, over: 0.8)
+        hand.sweep(-6, over: 0.8)
+        XCTAssertEqual(hand.fired.filter { $0 == .drag(.right) }.count, 3)
+        XCTAssertGreaterThanOrEqual(hand.fired.filter { $0 == .drag(.left) }.count, 2)
     }
 
-    func testAHandOpeningSlowlyIsNotABurst() {
+    func testADragIsNotSubjectToTheSettlingPause() {
+        // The pause exists so a flick can be repeated deliberately. A drag is
+        // one continuous movement, and pausing it would make it useless.
         var hand = Hand()
-        hand.openingFingers((0..<25).map { 0.15 + (0.70 - 0.15) * Double($0) / 24 }, step: 0.065)
-        XCTAssertTrue(hand.fired.isEmpty, "a burst is thrown open, not unfolded")
+        hand.pinch()
+        hand.sweep(12, over: 1.5)
+        XCTAssertGreaterThan(hand.fired.count, 1)
     }
 
-    func testClosingAndOpeningAgainIsASecondBurst() {
+    func testAPinchedHandHeldStillMovesNothing() {
         var hand = Hand()
-        hand.openingFingers([0.15, 0.20, 0.35, 0.55, 0.66, 0.66, 0.50, 0.30, 0.15, 0.20, 0.40, 0.60, 0.66])
-        XCTAssertEqual(hand.fired, [.burst, .burst], "two deliberate bursts are two launches")
+        hand.pinch()
+        hand.rest(for: 3.0, spread: Self.pinched)
+        XCTAssertTrue(hand.fired.isEmpty, "holding on is not moving")
+    }
+
+    func testLettingGoEndsTheDrag() {
+        var hand = Hand()
+        hand.pinch()
+        hand.sweep(6, over: 0.8)
+        let duringDrag = hand.fired.count
+        hand.release()
+        hand.move(6, over: 0.8, spread: 0.66)
+        XCTAssertEqual(
+            hand.fired.filter { if case .drag = $0 { return true } else { return false } }.count,
+            duringDrag,
+            "an open hand moving is not still dragging"
+        )
+    }
+
+    func testAnOpenHandNeverStartsADrag() {
+        var hand = Hand()
+        hand.rest(for: 0.5)
+        hand.move(12, over: 1.5)
+        XCTAssertFalse(hand.detector.isDragging)
+    }
+
+    func testAPinchCannotTakeOverPartWayThroughAFlick() {
+        // Fingers already together while flicking used to hand out the flick's
+        // own remaining travel as a drag notch — one flick, two apps.
+        var hand = Hand()
+        hand.move(6, over: 0.30, spread: Self.pinched)
+        hand.rest(for: 0.6, spread: Self.pinched)
+        XCTAssertEqual(hand.fired, [.swipe(.right)])
+    }
+
+    func testAHandLeavingTheFrameLetsGo() {
+        var hand = Hand()
+        hand.pinch()
+        hand.sweep(3, over: 0.4)
+        hand.detector.handLost()
+        XCTAssertFalse(hand.detector.isDragging)
+    }
+
+    func testAPinchSurvivesFingertipsThatCannotBeSeen() {
+        // A pinched hand in motion is blurred and its fingertips are the first
+        // landmarks to go. Losing them must not be read as letting go.
+        var hand = Hand()
+        hand.pinch()
+        hand.sweep(3, over: 0.4)
+        hand.move(6, over: 0.7, spread: nil)
+        XCTAssertTrue(hand.detector.isDragging)
+        XCTAssertGreaterThanOrEqual(hand.fired.count, 3)
     }
 
     // MARK: - Wiring
@@ -281,10 +398,10 @@ final class AirGestureDetectorTests: XCTestCase {
 
         source.start()
         source.emit(.swipe(.left))
-        source.emit(.burst)
+        source.emit(.drag(.right))
         source.stop()
 
-        XCTAssertEqual(seen, [.swipe(.left), .burst])
+        XCTAssertEqual(seen, [.swipe(.left), .drag(.right)])
         XCTAssertEqual(source.startCount, 1)
         XCTAssertEqual(source.stopCount, 1)
         XCTAssertFalse(source.isWatching)

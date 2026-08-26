@@ -12,6 +12,7 @@ struct SettingsSheet: View {
 
     @State private var editorTarget: EditorTarget?
     @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
+    @AppStorage(ClapPreferences.enabledKey) private var clapToOpenEnabled = false
     @AppStorage(SoundPreferences.effectsKey) private var soundEffectsEnabled = true
     @AppStorage(SoundPreferences.spokenLaunchKey) private var spokenLaunchEnabled = true
 
@@ -24,6 +25,7 @@ struct SettingsSheet: View {
             List {
                 appsSection
                 airGestureSection
+                clapSection
                 soundSection
                 librarySection
                 aboutSection
@@ -229,8 +231,44 @@ struct SettingsSheet: View {
         } header: {
             Text("Air Gestures")
         } footer: {
-            Text("Flick a hand left or right in front of the screen, from a foot or two away, to move between apps. The camera is used only while the launcher is open — nothing is recorded, and no video leaves the iPad.")
+            Text("Flick a hand left or right in front of the screen, from a foot or two away, and the apps move the other way — as though you were pushing the wall along. There is a short pause afterwards so you can bring your hand back and set up the next one.\n\nFor a longer journey, put your fingertips together and sweep: the wall comes with you until you open your hand again.\n\nThe camera is used only while the launcher is open — nothing is recorded, and no video leaves the iPad.")
         }
+    }
+
+    /// Switched off until asked for, because it runs the microphone. Same shape
+    /// as the camera switch, and the same bargain: turning it on is what asks.
+    private var clapSection: some View {
+        Section {
+            Toggle(isOn: $clapToOpenEnabled) {
+                Label("Clap Twice to Open", systemImage: "hands.clap")
+            }
+            .accessibilityIdentifier(AccessibilityID.clapToOpen)
+            .onChange(of: clapToOpenEnabled) { _, isOn in
+                guard isOn else { return }
+                Task { await confirmMicrophoneAccess() }
+            }
+        } header: {
+            Text("Clap to Open")
+        } footer: {
+            Text("Two quick claps open whichever app is in the middle. Holograph listens for the shape of a clap — loud, instant, and alone — so talking and music are ignored.\n\nThe microphone is used only while the launcher is open. Nothing is recorded: each moment of sound becomes a single loudness number and is thrown away, and no audio leaves the iPad.")
+        }
+    }
+
+    /// Asks for the microphone the moment the switch is turned on, and turns it
+    /// back off if the answer is no.
+    private func confirmMicrophoneAccess() async {
+        #if os(iOS)
+        guard await MicrophoneClapSource.requestAccess() else {
+            clapToOpenEnabled = false
+            model.alert = LauncherAlert(
+                title: "Microphone access is off",
+                message: MicrophoneClapSource.isAccessDenied
+                    ? "Clap to open needs the microphone. Turn it on for Holograph in the Settings app, under Privacy & Security → Microphone."
+                    : "Clap to open needs the microphone, and permission was not granted."
+            )
+            return
+        }
+        #endif
     }
 
     /// Asks for the camera the moment the switch is turned on, and turns it back

@@ -1,16 +1,40 @@
 import Foundation
 
-/// A hand flicked across the front of the screen.
+/// A hand moved across the front of the screen. Always the *physical* direction
+/// the hand went; what the carousel does about it is decided in one place, by
+/// `selectionStep`.
 enum AirSwipe: Equatable, Sendable {
     case left
     case right
+
+    /// How the selection moves when the hand goes this way.
+    ///
+    /// Pushing a hand to the left moves the wall of apps to the *right*, so the
+    /// app that was on the left arrives in the middle — the opposite of dragging
+    /// on glass, and the way this was asked for. The mapping lives here so
+    /// flicks and drags can never drift apart.
+    var selectionStep: Int {
+        switch self {
+        case .left: return -1
+        case .right: return 1
+        }
+    }
 }
 
 /// Something the hand did in front of the screen.
 enum AirGesture: Equatable, Sendable {
+    /// A flick: one app, then a pause before the next one counts.
     case swipe(AirSwipe)
-    /// Fingers gathered together and then thrown open — opens the centred app.
-    case burst
+    /// One notch of a pinched-hand drag. Free-running — pinch, sweep, and the
+    /// apps come with you.
+    case drag(AirSwipe)
+
+    /// Which way the carousel goes, whichever kind of movement this was.
+    var selectionStep: Int {
+        switch self {
+        case .swipe(let direction), .drag(let direction): return direction.selectionStep
+        }
+    }
 }
 
 /// Something that watches for air gestures. Behind a protocol so the launcher
@@ -130,14 +154,21 @@ struct HandReading: Equatable {
 
 /// Turns a stream of hand readings into gestures.
 ///
-/// Built as a small state machine over a smoothed position, which is what stops
-/// one flick counting twice. A threshold test on its own fires the moment it is
-/// crossed and then re-arms on a timer, so a single long sweep can trip it more
-/// than once and the hand's journey back can trip it again. Here a movement is
-/// a *stroke*: it opens when the hand starts moving, yields at most one gesture,
-/// and does not re-arm until the hand has come to rest. Starting and stopping
-/// use different speeds — hysteresis — so a hand hovering near the threshold
-/// cannot chatter between the two.
+/// There are two ways to move the wall, and they suit different journeys.
+///
+/// A **flick** is a discrete step: one app, then a pause. It is built as a small
+/// state machine over a smoothed position, which is what stops one flick
+/// counting twice. A threshold test on its own fires the moment it is crossed
+/// and then re-arms on a timer, so a single long sweep can trip it more than
+/// once and the hand's journey back can trip it again. Here a movement is a
+/// *stroke*: it opens when the hand starts moving, yields at most one gesture,
+/// and does not re-arm until the hand has come to rest *and* a settling pause
+/// has passed — long enough to bring the hand back and set it up again without
+/// the return counting for anything.
+///
+/// A **pinch drag** is continuous: put the fingertips together and the wall is
+/// yours, a notch of travel to an app, until the hand opens again. It is the
+/// answer to a long journey, which flicking one app at a time is not.
 ///
 /// The whole of the gesture logic, kept as a value type over plain numbers so it
 /// can be exercised without a camera, a hand, or a running app.
@@ -160,9 +191,7 @@ struct AirGestureDetector {
         /// How straight the path has to be: |net displacement| ÷ |path length|.
         var straightness: Double = 0.55
         /// Consecutive quiet readings that end a stroke that has not yet earned
-        /// a gesture. Re-arming after one that has takes a single reading: the
-        /// next stroke still has to earn its own gesture, so being eager there
-        /// costs nothing and losing a deliberate second flick costs a lot.
+        /// a gesture.
         var stillReadings: Int = 2
         /// How many recent speeds the stillness test takes the median of. One
         /// noisy frame must not read as the hand setting off again.
@@ -174,20 +203,27 @@ struct AirGestureDetector {
         /// A gap longer than this means the hand was lost and found again, not
         /// that it moved instantly.
         var maximumGap: TimeInterval = 0.4
+        /// Quiet after a flick before another one counts, so the hand can come
+        /// back and be set up again without any of that registering.
+        ///
+        /// A return stroke and a settle take about eight tenths of a second, so
+        /// this sits comfortably beyond it while still allowing roughly an app
+        /// every second — and a long journey is what the pinch drag is for.
+        var settleAfterSwipe: TimeInterval = 1.2
 
-        /// Fingers must have been at least this close for a burst to count.
-        /// Pinched fingertips sit about 0.13 spans from their centre.
-        var gatheredSpread: Double = 0.45
-        /// And must open at least this wide. A fully splayed hand reaches about
-        /// 0.69, so this sits comfortably inside what a hand can do.
-        var burstSpread: Double = 0.48
-        /// Opening by less than this is a hand relaxing, not a burst.
-        var burstGrowth: Double = 0.25
-        /// A burst is one quick action, not a slow unfurling.
-        var burstWindow: TimeInterval = 0.5
-        /// The fingers must come back below this before another burst counts,
-        /// so holding an open hand up does not launch things repeatedly.
-        var burstRearmSpread: Double = 0.42
+        /// Fingertips this close to their own centre, in spans, are pinched.
+        /// A real pinch reads about 0.13; a loosely closed hand about 0.35 and a
+        /// splayed one about 0.69, so this asks for the deliberate thing.
+        var pinchSpread: Double = 0.22
+        /// And this far apart is a hand that has let go. The gap between the two
+        /// is hysteresis: a spread wavering around one number must not make the
+        /// drag flicker on and off.
+        var releaseSpread: Double = 0.34
+        /// How long the fingers must stay together before the drag takes hold.
+        var pinchHold: TimeInterval = 0.15
+        /// How far a pinched hand travels for one app, in spans. Six inches of
+        /// hand is about three apps, so a comfortable arm's sweep crosses ten.
+        var dragNotchSpans: Double = 0.6
 
         /// Below this many readings there is not enough of a shape to judge.
         var minimumSamples: Int = 3
@@ -202,8 +238,9 @@ struct AirGestureDetector {
         /// The hand is moving and has not yet earned a gesture.
         case tracking(origin: Double, since: TimeInterval)
         /// A gesture has been given for this movement. Nothing more can fire
-        /// until the hand comes to rest — which is what makes the journey back
-        /// silent without having to guess how long it takes.
+        /// until the hand comes to rest and the settling pause has run out —
+        /// which is what makes the journey back silent without having to guess
+        /// how long it takes.
         case spent
     }
 
@@ -219,9 +256,12 @@ struct AirGestureDetector {
     private var stroke: Stroke = .idle
     private var stillCount = 0
     private var pathLength = 0.0
+    private var settledAt: TimeInterval = -.greatestFiniteMagnitude
 
-    private var spreads: [(value: Double, time: TimeInterval)] = []
-    private var burstArmed = true
+    /// When the fingers first came together, or `nil` if they are apart.
+    private var pinchedSince: TimeInterval?
+    /// Where the last drag notch was handed out.
+    private var lastNotch: Double?
 
     init(thresholds: Thresholds = .default) {
         self.thresholds = thresholds
@@ -244,15 +284,25 @@ struct AirGestureDetector {
         let speed = previous.map { abs(position - $0.position) / max(time - $0.time, 1e-6) } ?? 0
         if let previous { pathLength += abs(position - previous.position) }
 
-        // The burst is checked first: it happens with the hand still, so a hand
-        // that could be mid-burst is not mid-flick.
-        let gesture = burst(reading.spread, at: time) ?? swipe(position: position, speed: speed, at: time)
+        trackPinch(reading.spread, at: time)
+
+        let gesture: AirGesture?
+        if lastNotch != nil {
+            gesture = dragStep(to: position, spread: reading.spread)
+        } else if shouldBeginDrag(at: time) {
+            // Taking hold is not itself a movement; the wall waits for the hand.
+            lastNotch = position
+            gesture = nil
+        } else {
+            gesture = swipe(position: position, speed: speed, at: time)
+        }
+
         previous = (position, time)
         return gesture
     }
 
     /// The hand left the frame. Whatever was building is not a gesture, and a
-    /// hand that has gone has certainly stopped moving.
+    /// hand that has gone has certainly stopped moving — and has let go.
     mutating func handLost() {
         positionFilter.reset()
         smoothedSpan = nil
@@ -262,7 +312,8 @@ struct AirGestureDetector {
         stroke = .idle
         stillCount = 0
         pathLength = 0
-        spreads.removeAll()
+        pinchedSince = nil
+        lastNotch = nil
     }
 
     /// Exposed for tests; the camera never needs it.
@@ -271,7 +322,10 @@ struct AirGestureDetector {
         return false
     }
 
-    // MARK: - Swipes
+    /// Exposed for tests: whether a pinch currently has hold of the wall.
+    var isDragging: Bool { lastNotch != nil }
+
+    // MARK: - Flicks
 
     private mutating func swipe(position: Double, speed: Double, at time: TimeInterval) -> AirGesture? {
         history.append((position, time, speed))
@@ -309,6 +363,7 @@ struct AirGestureDetector {
                pathLength > 0, distance / pathLength >= thresholds.straightness {
                 stroke = .spent
                 stillCount = 0
+                settledAt = time + thresholds.settleAfterSwipe
                 return .swipe(displacement > 0 ? .right : .left)
             }
             // Ran out of movement, or went on too long to be a flick.
@@ -319,11 +374,11 @@ struct AirGestureDetector {
             return nil
 
         case .spent:
-            // One quiet reading is enough to re-arm. The next stroke still has
-            // to earn its own gesture, and the hand's journey back never has a
-            // quiet reading in it — so this costs no safety and stops a
-            // deliberate second flick being swallowed.
-            if stillCount >= 1 {
+            // Two conditions, and both matter. The hand has to have stopped, so
+            // the journey back is never the next gesture; and the settling pause
+            // has to have run out, so there is time to bring it back and set up
+            // again without hurrying.
+            if stillCount >= 1, time >= settledAt {
                 stroke = .idle
                 stillCount = 0
             }
@@ -331,33 +386,59 @@ struct AirGestureDetector {
         }
     }
 
-    // MARK: - Bursts
+    // MARK: - Pinch drag
 
-    private mutating func burst(_ spread: Double?, at time: TimeInterval) -> AirGesture? {
-        // Readings whose fingertips could not be resolved say nothing about
-        // whether the hand is open, so they are skipped rather than counted shut.
-        if let spread { spreads.append((spread, time)) }
-        spreads.removeAll { time - $0.time > thresholds.burstWindow }
+    /// Follows the fingers. A reading whose fingertips could not be resolved
+    /// says nothing either way, so it neither starts nor breaks a pinch — a
+    /// pinched hand in motion is blurred, and its fingertips are the first
+    /// landmarks to go.
+    private mutating func trackPinch(_ spread: Double?, at time: TimeInterval) {
+        guard let spread else { return }
+        if spread <= thresholds.pinchSpread {
+            if pinchedSince == nil { pinchedSince = time }
+        } else if spread >= thresholds.releaseSpread {
+            pinchedSince = nil
+        }
+    }
 
-        guard let current = spreads.last?.value else { return nil }
+    private func shouldBeginDrag(at time: TimeInterval) -> Bool {
+        // Only from a standing start. Taking hold in the middle of a flick — or
+        // in its tail, while the hand is still slowing down — would let one
+        // movement change its mind about what kind of movement it is, and pay
+        // out an extra app on the way through.
+        guard case .idle = stroke, let pinchedSince else { return false }
+        return time - pinchedSince >= thresholds.pinchHold
+    }
 
-        guard burstArmed else {
-            // Re-arms only once the fingers close again, so an open hand held up
-            // does not keep launching things.
-            if current <= thresholds.burstRearmSpread { burstArmed = true }
+    private mutating func dragStep(to position: Double, spread: Double?) -> AirGesture? {
+        if let spread, spread >= thresholds.releaseSpread {
+            endDrag()
             return nil
         }
+        guard let anchor = lastNotch else { return nil }
 
-        // Key paths cannot index tuple elements, hence the explicit closure.
-        let earlier = spreads.dropLast().map { $0.value }
-        guard spreads.count >= thresholds.minimumSamples,
-              current >= thresholds.burstSpread,
-              let gathered = earlier.min(),
-              gathered <= thresholds.gatheredSpread,
-              current - gathered >= thresholds.burstGrowth else { return nil }
+        let offset = position - anchor
+        guard abs(offset) >= thresholds.dragNotchSpans else { return nil }
 
-        burstArmed = false
-        return .burst
+        // One notch per reading, and the anchor moves by exactly one notch
+        // rather than to where the hand is: a sweep faster than the frame rate
+        // keeps its remaining travel and pays it out over the readings that
+        // follow, instead of losing it or firing a burst all at once.
+        let direction: AirSwipe = offset > 0 ? .right : .left
+        lastNotch = anchor + (offset > 0 ? thresholds.dragNotchSpans : -thresholds.dragNotchSpans)
+        return .drag(direction)
+    }
+
+    private mutating func endDrag() {
+        lastNotch = nil
+        pinchedSince = nil
+        // The flick machinery has been idle throughout; what it remembers of the
+        // drag is not a stroke, so none of it should count towards one.
+        history.removeAll()
+        recentSpeeds.removeAll()
+        stroke = .idle
+        stillCount = 0
+        pathLength = 0
     }
 }
 

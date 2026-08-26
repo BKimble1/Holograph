@@ -17,6 +17,7 @@
 		25BBAB3A7ACBA20C733D27F7 /* SoundFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */; };
 		26F1D6B8A66FB9A55B655AAD /* AccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F539C57FB878DB5F796B17 /* AccessibilityID.swift */; };
 		2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA647AD3FF45893A0F91BF3 /* StoredLauncherApp.swift */; };
+		2A5E17814F42868D716CC55E /* ClapDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0642883F157625C4F18412 /* ClapDetectorTests.swift */; };
 		2BE29D5DACEA3A8882C2C4A8 /* LauncherRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */; };
 		307CBA5ED99317F1710FC881 /* SelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A484FD65121E780E48A76D30 /* SelectionStore.swift */; };
 		3C9E61D37DF27C87E7936EC6 /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E21F2EDCED1B1AD8048733D8 /* PreviewSupport.swift */; };
@@ -27,6 +28,7 @@
 		4D44A4FB9FF0677BC1538FC6 /* IconProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */; };
 		51C725CBD28BC39F4855D38C /* SoundFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */; };
 		51F818343A8C821F3404AE5F /* IconArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */; };
+		54555844ED5B16DB8DD09E85 /* ClapListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081E328BEC7E6E6F97C7D726 /* ClapListener.swift */; };
 		5C98C499E9362BC4A220CB40 /* CameraAirGestureSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D66B4483A3915E44E018C2D0 /* CameraAirGestureSource.swift */; };
 		61038835CF496632377F4205 /* LaunchEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */; };
 		633D42495B20B1AB39DE78FA /* PageIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5652E29C8518F769C113B7 /* PageIndicator.swift */; };
@@ -46,6 +48,7 @@
 		9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */; };
 		A0651CF85CBA7439BCF5F6C3 /* IconProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */; };
 		A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */; };
+		A87534B87322ECC285CF6A41 /* MicrophoneClapSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBAA8251E6C53695056AFC6 /* MicrophoneClapSource.swift */; };
 		A8D1B7B0DEBEE97EB1D50CD8 /* AppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */; };
 		AB4F2869662119214BE296E9 /* LauncherLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */; };
 		B19DE4E04AD9BD7444632B19 /* HolographicCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */; };
@@ -88,6 +91,7 @@
 		01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherViewModelTests.swift; sourceTree = "<group>"; };
 		03956C5671B68FDCFE69DFCF /* EmptyLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyLauncherView.swift; sourceTree = "<group>"; };
 		080C0D0BBA8060A48D93ABAE /* LauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherRepository.swift; sourceTree = "<group>"; };
+		081E328BEC7E6E6F97C7D726 /* ClapListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClapListener.swift; sourceTree = "<group>"; };
 		08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLauncherRepository.swift; sourceTree = "<group>"; };
 		0A06365E98CE4387A5697824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubAppLauncher.swift; sourceTree = "<group>"; };
@@ -97,6 +101,7 @@
 		1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreLookupService.swift; sourceTree = "<group>"; };
 		1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconArtworkView.swift; sourceTree = "<group>"; };
 		1EF7ECF074794B8A13B19D7F /* LauncherUITestCase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherUITestCase.swift; sourceTree = "<group>"; };
+		1FBAA8251E6C53695056AFC6 /* MicrophoneClapSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneClapSource.swift; sourceTree = "<group>"; };
 		239FAC8B9251AA6EC0139A7E /* DemoContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContent.swift; sourceTree = "<group>"; };
 		2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidator.swift; sourceTree = "<group>"; };
 		2D39B4CBEC0FE2103BC9A6FE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -144,6 +149,7 @@
 		F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconProcessor.swift; sourceTree = "<group>"; };
 		F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorView.swift; sourceTree = "<group>"; };
+		FD0642883F157625C4F18412 /* ClapDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClapDetectorTests.swift; sourceTree = "<group>"; };
 		FE3DC9D2858A257624060AB1 /* HoloTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -310,9 +316,11 @@
 				1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */,
 				784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */,
 				D66B4483A3915E44E018C2D0 /* CameraAirGestureSource.swift */,
+				081E328BEC7E6E6F97C7D726 /* ClapListener.swift */,
 				4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */,
 				F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */,
 				2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */,
+				1FBAA8251E6C53695056AFC6 /* MicrophoneClapSource.swift */,
 				A484FD65121E780E48A76D30 /* SelectionStore.swift */,
 				2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */,
 			);
@@ -337,6 +345,7 @@
 				1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */,
 				86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */,
 				BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */,
+				FD0642883F157625C4F18412 /* ClapDetectorTests.swift */,
 				9795AB2394722BC0A465035C /* DemoContentTests.swift */,
 				77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */,
 				507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */,
@@ -497,6 +506,7 @@
 				D1B4449D8C19CD4AF7BAE369 /* AppStoreLookupService.swift in Sources */,
 				9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */,
 				5C98C499E9362BC4A220CB40 /* CameraAirGestureSource.swift in Sources */,
+				54555844ED5B16DB8DD09E85 /* ClapListener.swift in Sources */,
 				807497263DE17FA364CE9B42 /* DemoContent.swift in Sources */,
 				6CF5C3AD16DF011A142E4538 /* DemoIconArtwork.swift in Sources */,
 				19A2718C7151CA2EA73485E4 /* EmptyLauncherView.swift in Sources */,
@@ -518,6 +528,7 @@
 				DA5F699FCEB6156D363D69DF /* LauncherScreen.swift in Sources */,
 				C74D38AD278D6045AE68EE5B /* LauncherViewModel.swift in Sources */,
 				3E6231D2FB8ABF17E4BAAA33 /* LoadingScreen.swift in Sources */,
+				A87534B87322ECC285CF6A41 /* MicrophoneClapSource.swift in Sources */,
 				8CF1F164E4189DE9A2612FBD /* ModelContainerFactory.swift in Sources */,
 				633D42495B20B1AB39DE78FA /* PageIndicator.swift in Sources */,
 				4CC03438C803E6DD3D103100 /* PortalLaunchOverlay.swift in Sources */,
@@ -540,6 +551,7 @@
 				13277315FA1595FAD68DB32C /* AppStoreLookupTests.swift in Sources */,
 				A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */,
 				0F2C5B1B7CEB89591D8F6721 /* CarouselGeometryTests.swift in Sources */,
+				2A5E17814F42868D716CC55E /* ClapDetectorTests.swift in Sources */,
 				0EBCF848064C6917F8E44750 /* DemoContentTests.swift in Sources */,
 				A0651CF85CBA7439BCF5F6C3 /* IconProcessorTests.swift in Sources */,
 				9477E227CF3AF0E556BD8DD1 /* LaunchURLValidatorTests.swift in Sources */,

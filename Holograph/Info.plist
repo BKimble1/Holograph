@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Holograph can watch for a hand flicked left or right in front of the screen to move between your apps. The camera is used only while the launcher is open and this feature is switched on. Nothing is recorded, and no video ever leaves your iPad.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Holograph can listen for two claps to open the app in the middle of the launcher. The microphone is used only while the launcher is open and this feature is switched on. Nothing is recorded, and no audio ever leaves your iPad.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

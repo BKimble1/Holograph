@@ -14,6 +14,7 @@ final class AppServices {
     let feedback: FeedbackProviding
     let sound: SoundPlaying
     let airGestures: AirGestureObserving
+    let claps: ClapListening
     let selectionStore: SelectionStoring
     let iconProcessor: IconProcessor
     let metadataProvider: AppStoreMetadataProviding
@@ -24,6 +25,7 @@ final class AppServices {
         feedback: FeedbackProviding,
         sound: SoundPlaying,
         airGestures: AirGestureObserving,
+        claps: ClapListening,
         selectionStore: SelectionStoring,
         iconProcessor: IconProcessor = IconProcessor(),
         metadataProvider: AppStoreMetadataProviding = AppStoreLookupService()
@@ -33,6 +35,7 @@ final class AppServices {
         self.feedback = feedback
         self.sound = sound
         self.airGestures = airGestures
+        self.claps = claps
         self.selectionStore = selectionStore
         self.iconProcessor = iconProcessor
         self.metadataProvider = metadataProvider
@@ -89,16 +92,26 @@ struct AppComposition {
         // Tests must stay silent and deterministic, and nothing should try to
         // start an audio engine inside a test host.
         let staysQuiet = environment.isUITesting || LaunchEnvironment.isHostingUnitTests
-        let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
 
-        // Tests get a stub: there is no camera in the simulator, and a UI test
-        // must not depend on one.
+        // Tests get stubs: there is no camera and no room in the simulator, and
+        // a UI test must not depend on either.
         let airGestures: AirGestureObserving
+        let claps: ClapListening
         #if os(iOS)
         airGestures = staysQuiet ? InertAirGestureSource() : CameraAirGestureSource()
+        claps = staysQuiet ? InertClapListener() : MicrophoneClapSource()
         #else
         airGestures = InertAirGestureSource()
+        claps = InertClapListener()
         #endif
+
+        var sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
+        // The launcher's own tick and its voice come out of the same speaker the
+        // microphone is pointed at, and two ticks in a second read as a perfectly
+        // good double clap. Whenever it makes a noise, the listener looks away.
+        sound.onOwnSound = { [weak claps] duration in
+            claps?.mute(for: duration)
+        }
         let selectionStore: SelectionStoring = environment.isUITesting
             ? InMemorySelectionStore()
             : UserDefaultsSelectionStore()
@@ -109,6 +122,7 @@ struct AppComposition {
             feedback: feedback,
             sound: sound,
             airGestures: airGestures,
+            claps: claps,
             selectionStore: selectionStore
         )
 

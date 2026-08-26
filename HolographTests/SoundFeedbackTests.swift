@@ -274,10 +274,35 @@ final class SoundPreferencesTests: XCTestCase {
     }
 }
 
+/// The launcher's own speaker is the loudest thing in the microphone's world,
+/// so whoever is listening has to be told how long to look away for.
+final class SpokenDurationTests: XCTestCase {
+    func testItAllowsForTheWholePhrase() {
+        // Erring long is the safe direction: too short and the tail of
+        // "Opening…" gets heard as something happening in the room.
+        let estimate = SystemSound.spokenDuration(of: "Opening Truebearing")
+        XCTAssertGreaterThan(estimate, 1.6, "the phrase itself takes about this long to say")
+    }
+
+    func testALongerNameTakesLonger() {
+        XCTAssertGreaterThan(
+            SystemSound.spokenDuration(of: "Opening Photogrammetry Workbench"),
+            SystemSound.spokenDuration(of: "Opening Mail")
+        )
+    }
+
+    func testItNeverAsksForSilenceForeverOrNotAtAll() {
+        XCTAssertGreaterThan(SystemSound.spokenDuration(of: ""), 0)
+        XCTAssertLessThanOrEqual(SystemSound.spokenDuration(of: String(repeating: "a", count: 500)), 6)
+    }
+}
+
 @MainActor
 final class SilentSoundTests: XCTestCase {
     func testItRecordsWhatItWasAskedToPlay() {
         let sound = SilentSound()
+        var announced: [TimeInterval] = []
+        sound.onOwnSound = { announced.append($0) }
         sound.selectionTick()
         sound.selectionTick()
         sound.announceLaunch(of: "Truebearing")
@@ -286,5 +311,6 @@ final class SilentSoundTests: XCTestCase {
         XCTAssertEqual(sound.tickCount, 2)
         XCTAssertEqual(sound.announcements, ["Truebearing"])
         XCTAssertEqual(sound.cancelCount, 1)
+        XCTAssertTrue(announced.isEmpty, "a silent sound has nothing for the microphone to ignore")
     }
 }

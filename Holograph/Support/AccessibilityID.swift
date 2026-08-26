@@ -19,6 +19,7 @@ enum AccessibilityID {
     static let settingsDone = "settings.done"
     static let addApp = "settings.addApp"
     static let airGestures = "settings.airGestures"
+    static let clapToOpen = "settings.clapToOpen"
     static let soundEffects = "settings.soundEffects"
     static let spokenLaunch = "settings.spokenLaunch"
     static let restoreDemoApps = "settings.restoreDemoApps"

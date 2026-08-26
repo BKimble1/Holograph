@@ -127,7 +127,7 @@ class LauncherUITestCase: XCTestCase {
     /// Settings is a form sheet; the lower sections need scrolling into view
     /// before they can be tapped.
     @discardableResult
-    func revealInSettings(_ identifier: String, attempts: Int = 6) -> XCUIElement {
+    func revealInSettings(_ identifier: String, attempts: Int = 9) -> XCUIElement {
         let element = app.descendants(matching: .any)[identifier].firstMatch
         for _ in 0..<attempts {
             if element.exists, element.isHittable { return element }

@@ -21,6 +21,13 @@ protocol SoundPlaying: AnyObject {
     func announceLaunch(of name: String)
     /// Cuts any announcement still in flight, so leaving mid-sentence is quiet.
     func cancelSpeech()
+
+    /// Called whenever this makes a noise, with roughly how long it will last.
+    ///
+    /// The microphone hears the iPad's own speaker as clearly as it hears the
+    /// room, and two carousel ticks in quick succession are a textbook double
+    /// clap. Whoever is listening gets told to look away.
+    var onOwnSound: ((TimeInterval) -> Void)? { get set }
 }
 
 // MARK: - Preferences
@@ -39,6 +46,70 @@ enum SoundPreferences {
 
     static var spokenLaunchEnabled: Bool {
         UserDefaults.standard.object(forKey: spokenLaunchKey) as? Bool ?? true
+    }
+}
+
+// MARK: - The session
+
+/// One place decides what the audio session is for.
+///
+/// Two features want it and want different things: the tick and the voice need
+/// playback, and clap-to-open needs the microphone. Whichever configured itself
+/// last used to win, which is a coin toss dressed up as a bug. Here the answer
+/// is simply "recording if anything is listening, playback otherwise", and both
+/// callers go through it.
+@MainActor
+enum HoloAudioSession {
+    private static var listenerCount = 0
+    private static var applied: Bool?
+
+    /// Something needs the microphone.
+    static func requireInput() {
+        listenerCount += 1
+        apply()
+    }
+
+    /// And has finished with it.
+    static func releaseInput() {
+        listenerCount = max(0, listenerCount - 1)
+        apply()
+    }
+
+    /// Something is about to play a sound.
+    static func activate() {
+        apply()
+    }
+
+    private static var wantsInput: Bool { listenerCount > 0 }
+
+    private static func apply() {
+        #if os(iOS)
+        guard applied != wantsInput else { return }
+        applied = wantsInput
+        let logger = Logger(subsystem: "com.idlery.holograph", category: "sound")
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // `.playback` rather than `.ambient`: ambient audio is silenced by
+            // the Ring/Silent switch — on an iPad, the toggle in Control Centre
+            // — which mutes the tick and the announcement alike and looks
+            // exactly like the feature not working. These sounds are asked for
+            // rather than incidental, and Settings carries a switch for each, so
+            // they play on their own terms. `.mixWithOthers` keeps them from
+            // interrupting anything already playing, and `.defaultToSpeaker`
+            // keeps them out of the earpiece once recording is in the mix.
+            if wantsInput {
+                try session.setCategory(
+                    .playAndRecord, mode: .default,
+                    options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]
+                )
+            } else {
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            }
+            try session.setActive(true, options: [])
+        } catch {
+            logger.error("audio session unavailable: \(error.localizedDescription, privacy: .public)")
+        }
+        #endif
     }
 }
 
@@ -279,6 +350,8 @@ enum HoloVoice {
 /// failure leaves the launcher silent rather than broken.
 @MainActor
 final class SystemSound: SoundPlaying {
+    var onOwnSound: ((TimeInterval) -> Void)?
+
     private let synthesizer = AVSpeechSynthesizer()
     private let logger = Logger(subsystem: "com.idlery.holograph", category: "sound")
 
@@ -297,6 +370,9 @@ final class SystemSound: SoundPlaying {
         guard SoundPreferences.effectsEnabled, let player = availablePlayer() else { return }
         player.currentTime = 0
         player.play()
+        // The tick itself is over in twenty milliseconds; the quarter second
+        // covers the speaker settling and the room's answer to it.
+        onOwnSound?(0.25)
     }
 
     func announceLaunch(of name: String) {
@@ -319,6 +395,14 @@ final class SystemSound: SoundPlaying {
         utterance.postUtteranceDelay = 0
         utterance.volume = 0.95
         synthesizer.speak(utterance)
+        onOwnSound?(Self.spokenDuration(of: utterance.speechString))
+    }
+
+    /// Roughly how long a phrase takes at the rate above. Only ever used to
+    /// decide how long to stop listening for, so approximate is enough — and
+    /// erring long is the safe direction.
+    static func spokenDuration(of phrase: String) -> TimeInterval {
+        min(6, 1.2 + Double(phrase.count) * 0.075)
     }
 
     func cancelSpeech() {
@@ -354,26 +438,13 @@ final class SystemSound: SoundPlaying {
 
     // MARK: - Setup
 
-    /// `.playback` rather than `.ambient`.
-    ///
-    /// Ambient audio is silenced by the Ring/Silent switch — on an iPad, the
-    /// toggle in Control Centre — which mutes the tick and the announcement
-    /// alike and looks exactly like the feature not working. These sounds are
-    /// asked for rather than incidental, and Settings carries a switch for each,
-    /// so they play on their own terms. `.mixWithOthers` keeps them from
-    /// interrupting anything already playing.
+    /// The category itself is decided by `HoloAudioSession`, which is the only
+    /// thing that knows whether anything else on this device wants the
+    /// microphone at the same time.
     private func configureSessionIfNeeded() {
         guard !hasConfiguredSession else { return }
         hasConfiguredSession = true
-        #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true, options: [])
-        } catch {
-            logger.error("audio session unavailable: \(error.localizedDescription, privacy: .public)")
-        }
-        #endif
+        HoloAudioSession.activate()
     }
 
     private func availablePlayer() -> AVAudioPlayer? {
@@ -411,6 +482,8 @@ final class SystemSound: SoundPlaying {
 /// Non-Apple platforms get silence rather than a build error.
 @MainActor
 final class SystemSound: SoundPlaying {
+    var onOwnSound: ((TimeInterval) -> Void)?
+
     func selectionTick() {}
     func announceLaunch(of name: String) {}
     func cancelSpeech() {}
@@ -424,6 +497,8 @@ final class SystemSound: SoundPlaying {
 /// deterministic.
 @MainActor
 final class SilentSound: SoundPlaying {
+    var onOwnSound: ((TimeInterval) -> Void)?
+
     private(set) var tickCount = 0
     private(set) var announcements: [String] = []
     private(set) var cancelCount = 0
