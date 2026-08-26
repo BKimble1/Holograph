@@ -102,6 +102,8 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
     private let synthesizer = AVSpeechSynthesizer()
     private var chosen: SystemVoiceDescriptor?
     private var hasPrepared = false
+    /// The render in progress, so the next one can wait for it.
+    private var inFlight: Task<SpokenPhrase?, Never>?
 
     /// Unhurried and level, matching the register the neural voice is asked
     /// for. `AVSpeechUtterance.defaultSpeechRate` is 0.5; a shade under it
@@ -136,6 +138,27 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
         guard !trimmed.isEmpty else { return nil }
         if !hasPrepared { await prepare() }
 
+        // One phrase at a time. There is a single `AVSpeechSynthesizer` here
+        // with a single queue, and nothing in the API promises anything about
+        // being asked for two phrases at once — while the launcher genuinely
+        // does ask: the sweep that pre-renders the library is still running
+        // when a tap starts rendering the tile that was not reached yet. So
+        // renders line up behind each other instead of finding out.
+        let previous = inFlight
+        let task = Task { @MainActor [weak self] () -> SpokenPhrase? in
+            _ = await previous?.value
+            guard let self else { return nil }
+            return await self.write(trimmed)
+        }
+        inFlight = task
+        let rendered = await task.value
+        // Let go of the finished task, and with it the samples it is holding.
+        if inFlight == task { inFlight = nil }
+        return rendered
+    }
+
+    /// The render itself, only ever entered by one caller at a time.
+    private func write(_ trimmed: String) async -> SpokenPhrase? {
         let utterance = AVSpeechUtterance(string: trimmed)
         utterance.rate = Self.rate
         utterance.pitchMultiplier = Self.pitch

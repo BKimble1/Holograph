@@ -426,3 +426,50 @@ final class LayeredSpeechTests: XCTestCase {
         XCTAssertEqual(fallback.prepareCount, 1)
     }
 }
+
+/// The fallback voice on the device it actually runs on.
+///
+/// Deliberately light on claims about the audio: which voices a simulator has
+/// installed is not this project's business, and a test that insisted on
+/// samples would be testing the runner. What it does insist on is that the
+/// engine cannot hang, cannot trap, and cannot be confused by two callers at
+/// once — which is exactly what a single `AVSpeechSynthesizer` shared between
+/// the pre-render sweep and a tap would otherwise risk.
+@MainActor
+final class SystemVoiceEngineTests: XCTestCase {
+    func testPreparingChoosesAVoiceAndNeverReportsAProblem() async {
+        let engine = SystemVoiceSpeechEngine()
+        await engine.prepare()
+
+        XCTAssertTrue(engine.isReady)
+        XCTAssertNil(engine.unavailableReason, "there is no rung that says install something first")
+    }
+
+    func testAnEmptyPhraseIsRefusedWithoutTouchingTheSynthesiser() async {
+        let engine = SystemVoiceSpeechEngine()
+        let rendered = await engine.render("   ")
+        XCTAssertNil(rendered)
+    }
+
+    func testTwoRendersAtOnceBothFinish() async {
+        // The double-resume this guards against traps the process rather than
+        // failing an assertion, so reaching the end of this test at all is the
+        // substance of it.
+        let engine = SystemVoiceSpeechEngine()
+        await engine.prepare()
+
+        async let first = engine.render("Opening Mail")
+        async let second = engine.render("Opening Notes")
+        let (one, two) = await (first, second)
+
+        // Whatever the runner's voices can do, both callers must be answered
+        // the same way — one silently failing while the other works would mean
+        // they had collided.
+        XCTAssertEqual(one == nil, two == nil, "both renders resolve, or neither does")
+        if let one, let two {
+            XCTAssertGreaterThan(one.duration, 0)
+            XCTAssertGreaterThan(two.duration, 0)
+            XCTAssertEqual(one.sampleRate, two.sampleRate)
+        }
+    }
+}
