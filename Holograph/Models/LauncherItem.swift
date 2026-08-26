@@ -37,10 +37,18 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
     /// goes nowhere — it opens in place — and never `nil` for anything else.
     var launchURL: URL?
     var fallbackURL: URL?
-    /// The folder this belongs to, or `nil` when it sits on the root wall.
+    /// A folder this also appears in, or `nil` when it appears only on the
+    /// wall.
+    ///
+    /// *Also*, not *instead*. Putting something in a folder groups it; it does
+    /// not take it off the wall, any more than a playlist takes a song out of
+    /// your library. Folders are a second way to reach the same tile.
     var parentFolderID: UUID?
-    /// Position within its own scope: the root wall, or one folder.
+    /// Position on the wall.
     var sortOrder: Int
+    /// Position inside its folder, which is independent of its position on the
+    /// wall — the same tile can be third on the wall and first in a folder.
+    var folderSortOrder: Int
     var iconData: Data?
     var isDemo: Bool
     var createdAt: Date
@@ -54,6 +62,7 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
         fallbackURL: URL? = nil,
         parentFolderID: UUID? = nil,
         sortOrder: Int = 0,
+        folderSortOrder: Int = 0,
         iconData: Data? = nil,
         isDemo: Bool = false,
         createdAt: Date = .init(timeIntervalSinceReferenceDate: 0),
@@ -66,6 +75,7 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
         self.fallbackURL = fallbackURL
         self.parentFolderID = parentFolderID
         self.sortOrder = sortOrder
+        self.folderSortOrder = folderSortOrder
         self.iconData = iconData
         self.isDemo = isDemo
         self.createdAt = createdAt
@@ -160,14 +170,25 @@ extension LauncherItem {
 // MARK: - Scoping
 
 extension Array where Element == LauncherItem {
-    /// What the main wall shows: everything that is not tucked inside a folder.
+    /// What the main wall shows: everything.
+    ///
+    /// Being in a folder does not hide a tile from the wall. A folder is a
+    /// grouping you can also reach things through, not a drawer they are moved
+    /// into and disappear from.
     var rootItems: [LauncherItem] {
-        filter { $0.parentFolderID == nil }.sortedForDisplay()
+        sortedForDisplay()
     }
 
-    /// What one folder holds.
+    /// What one folder holds, in the folder's own order.
     func children(of folderID: UUID) -> [LauncherItem] {
-        filter { $0.parentFolderID == folderID }.sortedForDisplay()
+        filter { $0.parentFolderID == folderID }
+            .sorted { ($0.folderSortOrder, $0.createdAt) < ($1.folderSortOrder, $1.createdAt) }
+    }
+
+    /// What could still be added to a folder: everything that is not a folder
+    /// and is not already in this one.
+    func addableToFolder(_ folderID: UUID) -> [LauncherItem] {
+        filter { !$0.isFolder && $0.parentFolderID != folderID }.sortedForDisplay()
     }
 
     /// Only the folders, for the "move into…" pickers.

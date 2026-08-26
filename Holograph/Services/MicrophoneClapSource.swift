@@ -18,6 +18,9 @@ import AVFoundation
 @MainActor
 final class MicrophoneClapSource: ClapListening {
     var onDoubleClap: (() -> Void)?
+    /// Raw loudness, for calibration — which is measuring the thresholds the
+    /// detector uses and so cannot depend on them.
+    var onLevel: ((Double, TimeInterval) -> Void)?
     private(set) var isListening = false
 
     private let engine: ClapEngine
@@ -25,8 +28,12 @@ final class MicrophoneClapSource: ClapListening {
 
     init() {
         let relay = ClapRelay()
-        engine = ClapEngine(onDoubleClap: { [relay] in relay.deliver() })
+        engine = ClapEngine(
+            onDoubleClap: { [relay] in relay.deliver() },
+            onLevel: { [relay] level, time in relay.deliverLevel(level, time) }
+        )
         relay.handler = { [weak self] in self?.onDoubleClap?() }
+        relay.levelHandler = { [weak self] level, time in self?.onLevel?(level, time) }
     }
 
     func start() {
@@ -36,6 +43,8 @@ final class MicrophoneClapSource: ClapListening {
             return
         }
         isListening = true
+        // Whatever has been measured about how this person claps.
+        engine.setProfile(CalibrationStore.load())
         HoloAudioSession.requireInput()
         engine.start()
     }
@@ -49,6 +58,12 @@ final class MicrophoneClapSource: ClapListening {
 
     func mute(for duration: TimeInterval) {
         engine.mute(for: duration)
+    }
+
+    /// Whether raw loudness is reported alongside claps. Only calibration wants
+    /// it, and it is a stream of numbers thirty times a second.
+    func setReportsLevels(_ reports: Bool) {
+        engine.setReportsLevels(reports)
     }
 
     // MARK: - Permission
@@ -79,9 +94,14 @@ final class MicrophoneClapSource: ClapListening {
 /// anything that could call it has been started.
 private final class ClapRelay: @unchecked Sendable {
     var handler: (@MainActor () -> Void)?
+    var levelHandler: (@MainActor (Double, TimeInterval) -> Void)?
 
     func deliver() {
         Task { @MainActor in self.handler?() }
+    }
+
+    func deliverLevel(_ level: Double, _ time: TimeInterval) {
+        Task { @MainActor in self.levelHandler?(level, time) }
     }
 }
 
@@ -97,6 +117,8 @@ private final class ClapEngine: @unchecked Sendable {
     private let engine = AVAudioEngine()
     private let queue = DispatchQueue(label: "com.idlery.holograph.clap")
     private let onDoubleClap: @Sendable () -> Void
+    private let onLevel: @Sendable (Double, TimeInterval) -> Void
+    private var reportsLevels = false
     private let logger = Logger(subsystem: "com.idlery.holograph", category: "clap")
 
     private var detector = ClapDetector()
@@ -107,8 +129,24 @@ private final class ClapEngine: @unchecked Sendable {
     private var lastReading: TimeInterval = 0
     private var configurationObserver: NSObjectProtocol?
 
-    init(onDoubleClap: @escaping @Sendable () -> Void) {
+    init(
+        onDoubleClap: @escaping @Sendable () -> Void,
+        onLevel: @escaping @Sendable (Double, TimeInterval) -> Void
+    ) {
         self.onDoubleClap = onDoubleClap
+        self.onLevel = onLevel
+    }
+
+    func setReportsLevels(_ reports: Bool) {
+        queue.async { [self] in reportsLevels = reports }
+    }
+
+    /// Rebuilds the detector around whatever has been measured about this
+    /// person's clap.
+    func setProfile(_ profile: CalibrationProfile) {
+        queue.async { [self] in
+            detector = ClapDetector(thresholds: ClapDetector.Thresholds.default.applying(profile))
+        }
     }
 
     deinit {
@@ -180,6 +218,7 @@ private final class ClapEngine: @unchecked Sendable {
                 for (index, peak) in peaks.enumerated() {
                     let time = base + Double(index) * step
                     lastReading = time
+                    if reportsLevels { onLevel(Double(peak), time) }
                     if detector.heard(level: Double(peak), at: time) {
                         onDoubleClap()
                     }
@@ -225,6 +264,9 @@ private final class ClapEngine: @unchecked Sendable {
 @MainActor
 final class MicrophoneClapSource: ClapListening {
     var onDoubleClap: (() -> Void)?
+    /// Raw loudness, for calibration — which is measuring the thresholds the
+    /// detector uses and so cannot depend on them.
+    var onLevel: ((Double, TimeInterval) -> Void)?
     private(set) var isListening = false
 
     func start() { isListening = true }

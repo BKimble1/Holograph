@@ -114,6 +114,12 @@ final class LauncherViewModel {
         return counts
     }
 
+    /// Which folder a tile is grouped under, by name, or `nil`.
+    func folderName(containing item: LauncherItem) -> String? {
+        guard let parent = item.parentFolderID else { return nil }
+        return allItems.first { $0.id == parent && $0.isFolder }?.name
+    }
+
     func itemCount(inFolder id: UUID) -> Int {
         allItems.reduce(into: 0) { $0 += ($1.parentFolderID == id ? 1 : 0) }
     }

@@ -34,6 +34,10 @@ SOURCE_ROOTS = {
 
 # Directories treated as opaque bundles rather than walked into.
 BUNDLE_SUFFIXES = (".xcassets",)
+# Loose files that belong in the app bundle rather than being compiled. The
+# neural voice's style vector is one: it is data the app reads at runtime, not
+# an asset catalogue and not source.
+RESOURCE_SUFFIXES = (".bin",)
 
 SAFE = re.compile(r"^[A-Za-z0-9_./$][A-Za-z0-9_./$+-]*$")
 
@@ -108,7 +112,7 @@ def is_source(path: Path) -> bool:
 
 
 def is_resource(path: Path) -> bool:
-    return path.name.endswith(BUNDLE_SUFFIXES)
+    return path.name.endswith(BUNDLE_SUFFIXES) or path.suffix in RESOURCE_SUFFIXES
 
 
 class Writer:

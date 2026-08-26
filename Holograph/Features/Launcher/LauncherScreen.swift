@@ -26,7 +26,7 @@ struct LauncherScreen: View {
             // the wall drifts a little as the viewer moves, which is most of
             // what sells the depth.
             HoloBackgroundView()
-                .offset(scaledPerspective.offset(depth: 0.30, travel: 34))
+                .offset(scaledPerspective.offset(depth: 0.34, travel: 70))
 
             GeometryReader { proxy in
                 let layout = LauncherLayout(size: proxy.size)
@@ -48,16 +48,16 @@ struct LauncherScreen: View {
                         // The wall itself: nearer than the background, so it
                         // moves more, and turned very slightly towards wherever
                         // the viewer is sitting.
-                        .offset(scaledPerspective.offset(depth: 1.0, travel: 18))
+                        .offset(scaledPerspective.offset(depth: 1.0, travel: 46))
                         .rotation3DEffect(
-                            .degrees(scaledPerspective.rotation(maximum: 4.5)),
+                            .degrees(scaledPerspective.rotation(maximum: 9.0)),
                             axis: (x: 0, y: 1, z: 0),
                             anchor: .center,
                             anchorZ: 0,
                             perspective: 0.5
                         )
                         .rotation3DEffect(
-                            .degrees(-scaledPerspective.y * scaledPerspective.strength * 2.6),
+                            .degrees(-scaledPerspective.y * scaledPerspective.strength * 5.0),
                             axis: (x: 1, y: 0, z: 0),
                             anchor: .center,
                             anchorZ: 0,
@@ -357,10 +357,16 @@ struct LauncherScreen: View {
         // Only the object is captured, never the view: this handler outlives
         // any particular body evaluation.
         services.headTracking.onPerspective = { next in
-            // No animation: the tracker has already smoothed this, and layering
-            // a second smoother on top is what makes head tracking feel like
-            // syrup rather than glass.
-            motion.headPerspective = next
+            // Camera frames arrive about thirty times a second; the display
+            // draws two to four times as often. Assigning straight through
+            // therefore shows each reading as a held step, which is exactly the
+            // stair-stepping that reads as "glitchy" no matter how well the
+            // readings themselves are filtered. A short spring fills in the gap
+            // between frames, and being critically damped it adds no bounce of
+            // its own — it only stops the scene arriving in jumps.
+            withAnimation(.interpolatingSpring(duration: 0.14, bounce: 0)) {
+                motion.headPerspective = next
+            }
         }
         services.headTracking.start()
     }

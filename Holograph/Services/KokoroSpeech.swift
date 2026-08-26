@@ -18,8 +18,17 @@ enum KokoroModelStore {
     static let modelExtension = "mlmodelc"
     /// The style vector for one voice. Kokoro keeps its voices apart from the
     /// model, which is why a single model can speak in many of them.
+    ///
+    /// The file is 510 × 256 little-endian floats: one 256-wide style per
+    /// possible token length, which is how Kokoro adapts its prosody to the
+    /// length of what it is saying. Synthesis picks the row matching the phrase
+    /// rather than passing the whole block.
     static let voiceName = "bm_george"
     static let voiceExtension = "bin"
+    /// Width of one style row.
+    static let styleWidth = 256
+    /// How many rows the file holds.
+    static let styleRows = 510
 
     /// Where a provisioned model is kept.
     static var supportDirectory: URL? {
@@ -169,14 +178,18 @@ final class KokoroSpeechEngine: NeuralSpeaking {
     }
     #endif
 
-    /// A voice is a flat little array of 32-bit floats.
+    /// A voice is a flat block of 32-bit floats: `styleRows` rows of
+    /// `styleWidth` each.
     private static func readVoice(at url: URL) -> [Float]? {
         guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
               data.count % MemoryLayout<Float>.size == 0,
               !data.isEmpty else { return nil }
-        return data.withUnsafeBytes { raw in
+        let values: [Float] = data.withUnsafeBytes { raw in
             Array(raw.bindMemory(to: Float.self))
         }
+        // A file that is not a whole number of style rows is not this voice.
+        guard values.count % KokoroModelStore.styleWidth == 0 else { return nil }
+        return values
     }
 }
 
@@ -202,6 +215,10 @@ enum KokoroSynthesis {
         let logger = Logger(subsystem: "com.idlery.holograph", category: "speech")
         let tokens = KokoroTokenizer.tokens(for: phrase)
         guard !tokens.isEmpty else { return nil }
+        guard let style = KokoroVoice.style(from: voice, tokenCount: tokens.count) else {
+            logger.error("Kokoro voice has no style for a \(tokens.count)-token phrase")
+            return nil
+        }
 
         let description = model.modelDescription.inputDescriptionsByName
         guard description["input_ids"] != nil, description["style"] != nil else {
@@ -214,16 +231,18 @@ enum KokoroSynthesis {
             for (index, token) in tokens.enumerated() {
                 ids[index] = NSNumber(value: token)
             }
-            let style = try MLMultiArray(shape: [1, NSNumber(value: voice.count)], dataType: .float32)
-            for (index, value) in voice.enumerated() {
-                style[index] = NSNumber(value: value)
+            let styleArray = try MLMultiArray(
+                shape: [1, NSNumber(value: style.count)], dataType: .float32
+            )
+            for (index, value) in style.enumerated() {
+                styleArray[index] = NSNumber(value: value)
             }
             let speed = try MLMultiArray(shape: [1], dataType: .float32)
             speed[0] = NSNumber(value: rate)
 
             var features: [String: MLFeatureValue] = [
                 "input_ids": MLFeatureValue(multiArray: ids),
-                "style": MLFeatureValue(multiArray: style),
+                "style": MLFeatureValue(multiArray: styleArray),
             ]
             if description["speed"] != nil {
                 features["speed"] = MLFeatureValue(multiArray: speed)
@@ -250,6 +269,22 @@ enum KokoroSynthesis {
 }
 
 #endif
+
+/// Picks the style row that matches what is being said.
+///
+/// Pure, so the indexing can be checked without a model — and it is worth
+/// checking, because reading past the end of the block would be a crash on a
+/// long tile name rather than a wrong noise.
+enum KokoroVoice {
+    static func style(from voice: [Float], tokenCount: Int, width: Int = KokoroModelStore.styleWidth) -> [Float]? {
+        guard width > 0, voice.count >= width, voice.count % width == 0 else { return nil }
+        let rows = voice.count / width
+        // Kokoro indexes by the number of tokens, clamped to what the file has.
+        let row = min(max(tokenCount, 0), rows - 1)
+        let start = row * width
+        return Array(voice[start..<(start + width)])
+    }
+}
 
 /// Turns a phrase into the token ids Kokoro's text encoder expects.
 ///

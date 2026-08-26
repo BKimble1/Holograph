@@ -30,7 +30,8 @@ final class SwiftDataLauncherRepository: LauncherRepository {
             launchURLString: draft.launchURL?.absoluteString ?? "",
             fallbackURLString: draft.fallbackURL?.absoluteString,
             parentFolderID: parent,
-            sortOrder: try nextSortOrder(in: parent),
+            folderSortOrder: parent == nil ? 0 : try nextFolderOrder(in: parent),
+            sortOrder: try nextWallOrder(),
             iconData: draft.iconData,
             isDemo: draft.isDemo,
             createdAt: timestamp,
@@ -48,12 +49,12 @@ final class SwiftDataLauncherRepository: LauncherRepository {
         guard let record = try storedRecords().first(where: { $0.identifier == id }) else {
             throw LauncherRepositoryError.notFound
         }
-        let movedScope = record.parentFolderID != (draft.kind == .folder ? nil : draft.parentFolderID)
+        let joinedFolder = record.parentFolderID != (draft.kind == .folder ? nil : draft.parentFolderID)
         record.apply(draft, modifiedAt: now())
-        // Landing in a different scope means joining the end of it rather than
-        // keeping a position that belonged to somewhere else.
-        if movedScope {
-            record.sortOrder = try nextSortOrder(in: record.parentFolderID, excluding: record.identifier)
+        // Joining a folder means going to the end of it. Its place on the wall
+        // is untouched, because it never left the wall.
+        if joinedFolder, let folder = record.parentFolderID {
+            record.folderSortOrder = try nextFolderOrder(in: folder, excluding: record.identifier)
         }
         try save()
         try renumberEveryScope()
@@ -64,14 +65,12 @@ final class SwiftDataLauncherRepository: LauncherRepository {
         guard let record = records.first(where: { $0.identifier == id }) else {
             throw LauncherRepositoryError.notFound
         }
-        // A folder is a grouping, not a container that owns what it holds.
+        // A folder is a grouping, not a container that owns what it holds. Its
+        // members are already on the wall, so losing the folder simply loses
+        // the grouping.
         if record.kind == .folder {
-            let orphans = records.filter { $0.parentFolderID == id }
-            var next = try nextSortOrder(in: nil)
-            for orphan in orphans.sorted(by: { $0.sortOrder < $1.sortOrder }) {
-                orphan.parentFolderID = nil
-                orphan.sortOrder = next
-                next += 1
+            for member in records where member.parentFolderID == id {
+                member.parentFolderID = nil
             }
         }
         context.delete(record)
@@ -80,11 +79,24 @@ final class SwiftDataLauncherRepository: LauncherRepository {
     }
 
     func move(fromOffsets source: IndexSet, toOffset destination: Int, in parent: UUID?) throws {
-        var scope = try storedRecords().filter { $0.parentFolderID == parent }
+        let records = try storedRecords()
+        guard let folder = parent else {
+            var wall = records
+            guard !wall.isEmpty else { return }
+            wall.move(fromOffsets: source, toOffset: destination)
+            for (index, record) in wall.enumerated() where record.sortOrder != index {
+                record.sortOrder = index
+            }
+            try save()
+            return
+        }
+        var scope = records
+            .filter { $0.parentFolderID == folder }
+            .sorted { ($0.folderSortOrder ?? $0.sortOrder) < ($1.folderSortOrder ?? $1.sortOrder) }
         guard !scope.isEmpty else { return }
         scope.move(fromOffsets: source, toOffset: destination)
-        for (index, record) in scope.enumerated() where record.sortOrder != index {
-            record.sortOrder = index
+        for (index, record) in scope.enumerated() {
+            record.folderSortOrder = index
         }
         try save()
     }
@@ -100,7 +112,10 @@ final class SwiftDataLauncherRepository: LauncherRepository {
         }
         guard record.parentFolderID != parent else { return }
         record.parentFolderID = parent
-        record.sortOrder = try nextSortOrder(in: parent, excluding: id)
+        // Its place on the wall is untouched: it never left.
+        if let parent {
+            record.folderSortOrder = try nextFolderOrder(in: parent, excluding: id)
+        }
         record.modifiedAt = now()
         try save()
         try renumberEveryScope()
@@ -119,7 +134,7 @@ final class SwiftDataLauncherRepository: LauncherRepository {
         }
         let timestamp = now()
         var next: [UUID?: Int] = [:]
-        for draft in drafts {
+        for (wallOrder, draft) in drafts.enumerated() {
             let parent = draft.kind == .folder ? nil : draft.parentFolderID
             let order = next[parent] ?? 0
             next[parent] = order + 1
@@ -130,7 +145,8 @@ final class SwiftDataLauncherRepository: LauncherRepository {
                     launchURLString: draft.launchURL?.absoluteString ?? "",
                     fallbackURLString: draft.fallbackURL?.absoluteString,
                     parentFolderID: parent,
-                    sortOrder: order,
+                    folderSortOrder: order,
+                    sortOrder: wallOrder,
                     iconData: draft.iconData,
                     isDemo: draft.isDemo,
                     createdAt: timestamp,
@@ -154,20 +170,32 @@ final class SwiftDataLauncherRepository: LauncherRepository {
         }
     }
 
-    private func nextSortOrder(in parent: UUID?, excluding id: UUID? = nil) throws -> Int {
-        let scope = try storedRecords()
-            .filter { $0.parentFolderID == parent && $0.identifier != id }
-        return (scope.map(\.sortOrder).max() ?? -1) + 1
+    private func nextWallOrder() throws -> Int {
+        (try storedRecords().map(\.sortOrder).max() ?? -1) + 1
     }
 
-    /// Each scope numbers itself from zero, independently of every other.
+    private func nextFolderOrder(in folder: UUID?, excluding id: UUID? = nil) throws -> Int {
+        guard let folder else { return 0 }
+        let members = try storedRecords()
+            .filter { $0.parentFolderID == folder && $0.identifier != id }
+        return (members.compactMap(\.folderSortOrder).max() ?? -1) + 1
+    }
+
+    /// The wall numbers itself from zero, and so does each folder — separately,
+    /// because a tile lives in both at once.
     private func renumberEveryScope() throws {
         let records = try storedRecords()
         var didChange = false
-        for scope in Set(records.map(\.parentFolderID)) {
-            let members = records.filter { $0.parentFolderID == scope }
-            for (index, record) in members.enumerated() where record.sortOrder != index {
-                record.sortOrder = index
+        for (index, record) in records.enumerated() where record.sortOrder != index {
+            record.sortOrder = index
+            didChange = true
+        }
+        for folder in Set(records.compactMap(\.parentFolderID)) {
+            let members = records
+                .filter { $0.parentFolderID == folder }
+                .sorted { ($0.folderSortOrder ?? $0.sortOrder) < ($1.folderSortOrder ?? $1.sortOrder) }
+            for (index, record) in members.enumerated() where record.folderSortOrder != index {
+                record.folderSortOrder = index
                 didChange = true
             }
         }

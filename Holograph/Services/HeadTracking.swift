@@ -69,11 +69,14 @@ struct HeadTracker {
     struct Thresholds: Equatable {
         /// Movement inside this fraction of the range is treated as stillness.
         /// A viewer sitting still should get a still scene.
-        var deadZone: Double = 0.06
+        var deadZone: Double = 0.05
         /// How far the head has to travel across the frame for the full
         /// effect. Smaller than the whole frame, because nobody moves their
-        /// head from edge to edge to look at a launcher.
-        var range: Double = 0.28
+        /// head from edge to edge to look at a launcher — and smaller again
+        /// after the first device test, where the effect was reported as too
+        /// small to read as depth. A shorter range means an ordinary shift of
+        /// the head reaches the full parallax instead of a fraction of it.
+        var range: Double = 0.17
         /// The head is measured against where it was first seen, so the effect
         /// is about *moving*, not about sitting off-centre.
         var recentresAfter: TimeInterval = 4.0
@@ -82,6 +85,14 @@ struct HeadTracker {
         /// lost for a frame is not a lurch.
         var fadeInRate: Double = 2.0
         var fadeOutRate: Double = 1.2
+        /// Cutoff of the position filter while the head is still, in hertz.
+        /// Lower is steadier and laggier. A face box wobbles far more than a
+        /// hand does, and this is the number that decides whether the scene
+        /// reads as glass or as jelly.
+        var stillCutoff: Double = 0.45
+        /// How much the cutoff opens up with speed, so a real movement is not
+        /// smoothed into treacle.
+        var speedCutoff: Double = 2.4
         /// A gap longer than this means the stream stopped, not that the head
         /// teleported.
         var maximumGap: TimeInterval = 0.5
@@ -101,11 +112,13 @@ struct HeadTracker {
         self.thresholds = thresholds
         // The 1€ filter's defaults are tuned for a hand crossing the frame in a
         // third of a second. A head is slower and its jitter matters more, so
-        // it is smoothed harder and allowed to keep up less eagerly.
-        horizontal.minimumCutoff = 0.7
-        horizontal.speedCoefficient = 1.2
-        vertical.minimumCutoff = 0.7
-        vertical.speedCoefficient = 1.2
+        // it is smoothed much harder while still — and then allowed to open up
+        // sharply with speed, which is the whole point of this filter and what
+        // keeps a deliberate lean from feeling delayed.
+        horizontal.minimumCutoff = thresholds.stillCutoff
+        horizontal.speedCoefficient = thresholds.speedCutoff
+        vertical.minimumCutoff = thresholds.stillCutoff
+        vertical.speedCoefficient = thresholds.speedCutoff
     }
 
     /// Feeds one observation and returns the viewing position to draw with.

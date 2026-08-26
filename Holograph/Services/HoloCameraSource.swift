@@ -25,12 +25,18 @@ final class HoloCameraSource {
     enum Consumer: Hashable, CaseIterable {
         case gestures
         case head
+        /// Calibration, which wants the raw readings rather than the gestures
+        /// made out of them — the thresholds it is measuring are exactly the
+        /// ones it must not depend on.
+        case calibration
     }
 
     static let shared = HoloCameraSource()
 
     var onGesture: ((AirGesture) -> Void)?
     var onPerspective: ((HeadPerspective) -> Void)?
+    var onHandReading: ((HandReading, TimeInterval) -> Void)?
+    var onHeadReading: ((HeadReading, TimeInterval) -> Void)?
 
     private(set) var attached: Set<Consumer> = []
     var isRunning: Bool { !attached.isEmpty }
@@ -42,10 +48,14 @@ final class HoloCameraSource {
         let relay = CameraRelay()
         engine = CaptureEngine(
             onGesture: { [relay] gesture in relay.deliverGesture(gesture) },
-            onPerspective: { [relay] perspective in relay.deliverPerspective(perspective) }
+            onPerspective: { [relay] perspective in relay.deliverPerspective(perspective) },
+            onHandReading: { [relay] reading, time in relay.deliverHand(reading, time) },
+            onHeadReading: { [relay] reading, time in relay.deliverHead(reading, time) }
         )
         relay.gestureHandler = { [weak self] gesture in self?.onGesture?(gesture) }
         relay.perspectiveHandler = { [weak self] perspective in self?.onPerspective?(perspective) }
+        relay.handHandler = { [weak self] reading, time in self?.onHandReading?(reading, time) }
+        relay.headHandler = { [weak self] reading, time in self?.onHeadReading?(reading, time) }
     }
 
     func start(_ consumer: Consumer) {
@@ -55,16 +65,29 @@ final class HoloCameraSource {
             return
         }
         attached.insert(consumer)
-        engine.setAnalyses(hands: attached.contains(.gestures), faces: attached.contains(.head))
+        applyAnalyses()
         engine.start()
     }
 
     func stop(_ consumer: Consumer) {
         guard attached.remove(consumer) != nil else { return }
-        engine.setAnalyses(hands: attached.contains(.gestures), faces: attached.contains(.head))
+        applyAnalyses()
         if attached.isEmpty {
             engine.stop()
         }
+    }
+
+    /// Re-reads the calibration profile and tells the engine what to run.
+    /// Called on every attach and detach, so a profile saved during
+    /// calibration takes effect the moment the feature is switched back on.
+    private func applyAnalyses() {
+        let calibrating = attached.contains(.calibration)
+        engine.setAnalyses(
+            hands: attached.contains(.gestures) || calibrating,
+            faces: attached.contains(.head) || calibrating,
+            raw: calibrating
+        )
+        engine.setProfile(CalibrationStore.load())
     }
 
     // MARK: - Permission
@@ -97,6 +120,8 @@ final class HoloCameraSource {
 private final class CameraRelay: @unchecked Sendable {
     var gestureHandler: (@MainActor (AirGesture) -> Void)?
     var perspectiveHandler: (@MainActor (HeadPerspective) -> Void)?
+    var handHandler: (@MainActor (HandReading, TimeInterval) -> Void)?
+    var headHandler: (@MainActor (HeadReading, TimeInterval) -> Void)?
 
     func deliverGesture(_ gesture: AirGesture) {
         Task { @MainActor in self.gestureHandler?(gesture) }
@@ -104,6 +129,14 @@ private final class CameraRelay: @unchecked Sendable {
 
     func deliverPerspective(_ perspective: HeadPerspective) {
         Task { @MainActor in self.perspectiveHandler?(perspective) }
+    }
+
+    func deliverHand(_ reading: HandReading, _ time: TimeInterval) {
+        Task { @MainActor in self.handHandler?(reading, time) }
+    }
+
+    func deliverHead(_ reading: HeadReading, _ time: TimeInterval) {
+        Task { @MainActor in self.headHandler?(reading, time) }
     }
 }
 
@@ -127,19 +160,32 @@ private final class CaptureEngine: @unchecked Sendable {
 
     init(
         onGesture: @escaping @Sendable (AirGesture) -> Void,
-        onPerspective: @escaping @Sendable (HeadPerspective) -> Void
+        onPerspective: @escaping @Sendable (HeadPerspective) -> Void,
+        onHandReading: @escaping @Sendable (HandReading, TimeInterval) -> Void,
+        onHeadReading: @escaping @Sendable (HeadReading, TimeInterval) -> Void
     ) {
         processor = FrameProcessor()
         processor.onGesture = onGesture
         processor.onPerspective = onPerspective
+        processor.onHandReading = onHandReading
+        processor.onHeadReading = onHeadReading
     }
 
     /// Which Vision requests are worth running. Face detection is not free, so
     /// it only runs when something is actually using a viewing angle.
-    func setAnalyses(hands: Bool, faces: Bool) {
+    func setAnalyses(hands: Bool, faces: Bool, raw: Bool) {
         queue.async { [self] in
             processor.tracksHands = hands
             processor.tracksFaces = faces
+            processor.emitsRawReadings = raw
+        }
+    }
+
+    /// Rebuilds the detectors around whatever has been measured about this
+    /// person.
+    func setProfile(_ profile: CalibrationProfile) {
+        queue.async { [self] in
+            processor.apply(profile)
         }
     }
 
@@ -234,9 +280,12 @@ private final class CaptureEngine: @unchecked Sendable {
 private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     var onGesture: (@Sendable (AirGesture) -> Void)?
     var onPerspective: (@Sendable (HeadPerspective) -> Void)?
+    var onHandReading: (@Sendable (HandReading, TimeInterval) -> Void)?
+    var onHeadReading: (@Sendable (HeadReading, TimeInterval) -> Void)?
 
     var tracksHands = false
     var tracksFaces = false
+    var emitsRawReadings = false
 
     private var detector = AirGestureDetector()
     private var tracker = HeadTracker()
@@ -277,6 +326,12 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
     override init() {
         handRequest.maximumHandCount = 1
         super.init()
+    }
+
+    /// Rebuilds both detectors with this person's measured thresholds.
+    func apply(_ profile: CalibrationProfile) {
+        detector = AirGestureDetector(thresholds: AirGestureDetector.Thresholds.default.applying(profile))
+        tracker = HeadTracker(thresholds: HeadTracker.Thresholds().applying(profile))
     }
 
     func reset() {
@@ -341,6 +396,7 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
 
         lastHandSeen = timestamp
         lastSpan = reading.span
+        if emitsRawReadings { onHandReading?(reading, timestamp) }
         if let gesture = detector.handSeen(reading, time: timestamp) {
             onGesture?(gesture)
         }
@@ -357,18 +413,15 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
         }
         lastFaceSeen = timestamp
         let box = face.boundingBox
-        onPerspective?(
-            tracker.headSeen(
-                HeadReading(
-                    // Vision's origin is the bottom left, and the frame is
-                    // already mirrored, so this reads the way the viewer moves.
-                    x: Double(box.midX) * 2 - 1,
-                    y: Double(box.midY) * 2 - 1,
-                    scale: Double(box.height)
-                ),
-                at: timestamp
-            )
+        let reading = HeadReading(
+            // Vision's origin is the bottom left, and the frame is already
+            // mirrored, so this reads the way the viewer moves.
+            x: Double(box.midX) * 2 - 1,
+            y: Double(box.midY) * 2 - 1,
+            scale: Double(box.height)
         )
+        if emitsRawReadings { onHeadReading?(reading, timestamp) }
+        onPerspective?(tracker.headSeen(reading, at: timestamp))
     }
 
     /// Reduces a hand to what the detector needs, measured against the hand's

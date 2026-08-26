@@ -42,8 +42,12 @@ final class StoredLauncherApp {
     /// The raw value of `LauncherItemKind`. `nil` means a record from before
     /// there was anything but apps.
     var kindRaw: String?
-    /// The folder this belongs to, or `nil` for the root wall.
+    /// A folder this also appears in, or `nil`. It stays on the wall either
+    /// way.
     var parentFolderID: UUID?
+    /// Position inside that folder, independent of its position on the wall.
+    /// `nil` on records written before folders existed.
+    var folderSortOrder: Int?
 
     init(
         identifier: UUID = UUID(),
@@ -52,6 +56,7 @@ final class StoredLauncherApp {
         launchURLString: String,
         fallbackURLString: String? = nil,
         parentFolderID: UUID? = nil,
+        folderSortOrder: Int? = nil,
         sortOrder: Int,
         iconData: Data? = nil,
         isDemo: Bool = false,
@@ -64,6 +69,7 @@ final class StoredLauncherApp {
         self.launchURLString = launchURLString
         self.fallbackURLString = fallbackURLString
         self.parentFolderID = parentFolderID
+        self.folderSortOrder = folderSortOrder
         self.sortOrder = sortOrder
         self.iconData = iconData
         self.isDemo = isDemo
@@ -95,6 +101,7 @@ extension StoredLauncherApp {
             fallbackURL: fallbackURLString.flatMap(URL.init(string:)),
             parentFolderID: kind == .folder ? nil : parentFolderID,
             sortOrder: sortOrder,
+            folderSortOrder: folderSortOrder ?? sortOrder,
             iconData: iconData,
             isDemo: isDemo,
             createdAt: createdAt,

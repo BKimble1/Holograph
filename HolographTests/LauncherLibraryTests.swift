@@ -28,11 +28,13 @@ private func folder(_ name: String, order: Int = 0) -> LauncherItem {
 /// The wall shows the root; a folder shows its own contents. Two scopes, and
 /// nothing in one may leak into the other.
 final class LauncherScopingTests: XCTestCase {
-    func testTheRootHoldsOnlyWhatIsNotInAFolder() {
+    func testTheWallHoldsEverything() {
+        // A folder groups tiles; it does not take them off the wall. Being in
+        // one is a second way to reach something, not a place it disappears to.
         let work = folder("Work")
         let items = [work, app("Mail"), app("Notes", in: work.id), website("Idlery", in: work.id)]
 
-        XCTAssertEqual(items.rootItems.map(\.name), ["Work", "Mail"])
+        XCTAssertEqual(Set(items.rootItems.map(\.name)), ["Work", "Mail", "Notes", "Idlery"])
     }
 
     func testAFolderHoldsOnlyItsOwn() {
@@ -44,24 +46,34 @@ final class LauncherScopingTests: XCTestCase {
         XCTAssertEqual(items.children(of: home.id).map(\.name), ["Recipes"])
     }
 
-    func testNothingIsShownTwice() {
-        // The one thing that would look obviously broken: a tile on the wall
-        // *and* inside the folder it belongs to.
+    func testSomethingInAFolderIsInBothPlaces() {
         let work = folder("Work")
         let items = [work, app("Notes", in: work.id)]
 
-        XCTAssertFalse(items.rootItems.contains { $0.name == "Notes" })
-        XCTAssertEqual(items.children(of: work.id).count, 1)
+        XCTAssertTrue(items.rootItems.contains { $0.name == "Notes" }, "still on the wall")
+        XCTAssertEqual(items.children(of: work.id).map(\.name), ["Notes"], "and in the folder")
     }
 
-    func testEachScopeIsOrderedOnItsOwn() {
-        let work = folder("Work", order: 1)
-        let items = [
-            app("Second", order: 1), work,
-            app("B", in: work.id, order: 1), app("A", in: work.id, order: 0),
-        ]
-        XCTAssertEqual(items.rootItems.map(\.name), ["Second", "Work"])
-        XCTAssertEqual(items.children(of: work.id).map(\.name), ["A", "B"])
+    func testOnlyThingsNotAlreadyInAFolderCanBeAddedToIt() {
+        let work = folder("Work")
+        let home = folder("Home")
+        let items = [work, home, app("Notes", in: work.id), app("Mail")]
+
+        let addable = items.addableToFolder(work.id).map(\.name)
+        XCTAssertEqual(addable, ["Mail"], "a folder cannot be added to a folder, nor a member re-added")
+    }
+
+    func testTheWallAndAFolderAreOrderedIndependently() {
+        // The same tile can be last on the wall and first in its folder.
+        let work = folder("Work", order: 0)
+        var first = app("Alpha", in: work.id, order: 1)
+        first.folderSortOrder = 1
+        var second = app("Beta", in: work.id, order: 2)
+        second.folderSortOrder = 0
+
+        let items = [work, first, second]
+        XCTAssertEqual(items.rootItems.map(\.name), ["Work", "Alpha", "Beta"])
+        XCTAssertEqual(items.children(of: work.id).map(\.name), ["Beta", "Alpha"])
     }
 }
 
@@ -185,17 +197,15 @@ final class LauncherFolderRepositoryTests: XCTestCase {
         [("in-memory", InMemoryLauncherRepository())]
     }
 
-    func testAddingPutsThingsAtTheEndOfTheirOwnScope() throws {
+    func testAddingPutsThingsAtTheEndOfBothScopes() throws {
         for (label, repository) in repositories() {
             let work = try repository.add(LauncherItemDraft(kind: .folder, name: "Work"))
             _ = try repository.add(draftApp("Mail"))
-            let inside = try repository.add(draftApp("Notes", in: work.id))
-            let alsoInside = try repository.add(draftApp("Slides", in: work.id))
+            _ = try repository.add(draftApp("Notes", in: work.id))
+            _ = try repository.add(draftApp("Slides", in: work.id))
 
-            XCTAssertEqual(inside.sortOrder, 0, label)
-            XCTAssertEqual(alsoInside.sortOrder, 1, label)
             let all = try repository.fetchAll()
-            XCTAssertEqual(all.rootItems.map(\.name), ["Work", "Mail"], label)
+            XCTAssertEqual(all.rootItems.map(\.name), ["Work", "Mail", "Notes", "Slides"], label)
             XCTAssertEqual(all.children(of: work.id).map(\.name), ["Notes", "Slides"], label)
         }
     }
@@ -206,23 +216,40 @@ final class LauncherFolderRepositoryTests: XCTestCase {
             _ = try repository.add(draftApp("Mail"))
             _ = try repository.add(draftApp("Notes", in: work.id))
             _ = try repository.add(draftApp("Slides", in: work.id))
+            let wallBefore = try repository.fetchAll().rootItems.map(\.name)
 
             try repository.move(fromOffsets: IndexSet(integer: 1), toOffset: 0, in: work.id)
 
             let all = try repository.fetchAll()
             XCTAssertEqual(all.children(of: work.id).map(\.name), ["Slides", "Notes"], label)
-            XCTAssertEqual(all.rootItems.map(\.name), ["Work", "Mail"], label)
+            XCTAssertEqual(all.rootItems.map(\.name), wallBefore, "\(label): the wall is untouched")
         }
     }
 
-    func testMovingIntoAndOutOfAFolder() throws {
+    func testReorderingTheWallLeavesFoldersAlone() throws {
+        for (label, repository) in repositories() {
+            let work = try repository.add(LauncherItemDraft(kind: .folder, name: "Work"))
+            _ = try repository.add(draftApp("Notes", in: work.id))
+            _ = try repository.add(draftApp("Slides", in: work.id))
+
+            try repository.move(fromOffsets: IndexSet(integer: 2), toOffset: 0, in: nil)
+
+            let all = try repository.fetchAll()
+            XCTAssertEqual(all.children(of: work.id).map(\.name), ["Notes", "Slides"], label)
+        }
+    }
+
+    func testAddingToAFolderKeepsItOnTheWall() throws {
         for (label, repository) in repositories() {
             let work = try repository.add(LauncherItemDraft(kind: .folder, name: "Work"))
             let mail = try repository.add(draftApp("Mail"))
 
             try repository.setParent(of: mail.id, to: work.id)
             XCTAssertEqual(try repository.fetchAll().children(of: work.id).map(\.name), ["Mail"], label)
-            XCTAssertFalse(try repository.fetchAll().rootItems.contains { $0.name == "Mail" }, label)
+            XCTAssertTrue(
+                try repository.fetchAll().rootItems.contains { $0.name == "Mail" },
+                "\(label): adding to a folder is not taking off the wall"
+            )
 
             try repository.setParent(of: mail.id, to: nil)
             XCTAssertTrue(try repository.fetchAll().rootItems.contains { $0.name == "Mail" }, label)
@@ -253,8 +280,7 @@ final class LauncherFolderRepositoryTests: XCTestCase {
             try repository.setParent(of: inner.id, to: outer.id)
 
             let all = try repository.fetchAll()
-            XCTAssertEqual(all.rootItems.count, 2, "\(label): folders do not nest")
-            XCTAssertTrue(all.children(of: outer.id).isEmpty, label)
+            XCTAssertTrue(all.children(of: outer.id).isEmpty, "\(label): folders do not nest")
         }
     }
 

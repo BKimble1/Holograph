@@ -28,7 +28,11 @@ final class FolderStageTests: XCTestCase {
         let harness = LauncherHarness(items: items)
         harness.model.load()
 
-        XCTAssertEqual(harness.model.items.map(\.name), ["Mail", "Work", "Slides"])
+        XCTAssertEqual(
+            harness.model.items.map(\.name),
+            ["Mail", "Work", "Slides", "Notes", "Idlery"],
+            "everything is on the wall, including what is grouped in a folder"
+        )
 
         harness.model.enterFolder(folder.id)
         XCTAssertEqual(harness.model.items.map(\.name), ["Notes", "Idlery"])
@@ -47,7 +51,7 @@ final class FolderStageTests: XCTestCase {
         harness.model.closeFolder()
 
         XCTAssertFalse(harness.model.isFolderOpen)
-        XCTAssertEqual(harness.model.items.map(\.name), ["Mail", "Work", "Slides"])
+        XCTAssertEqual(harness.model.items.count, 5)
         XCTAssertEqual(harness.model.selectedID, folder.id, "back on the folder it came from")
     }
 
@@ -111,7 +115,7 @@ final class FolderStageTests: XCTestCase {
         harness.model.delete(id: folder.id)
 
         XCTAssertFalse(harness.model.isFolderOpen)
-        // And its contents came back to the wall rather than going with it.
+        // Its members were never off the wall; only the grouping is gone.
         XCTAssertEqual(Set(harness.model.items.map(\.name)), ["Mail", "Slides", "Notes", "Idlery"])
     }
 
@@ -124,7 +128,7 @@ final class FolderStageTests: XCTestCase {
         XCTAssertEqual(harness.model.folderCounts[folder.id], 2)
     }
 
-    func testMovingSomethingIntoAFolderTakesItOffTheWall() {
+    func testAddingSomethingToAFolderLeavesItOnTheWall() {
         let (folder, items) = library()
         let harness = LauncherHarness(items: items)
         harness.model.load()
@@ -132,8 +136,9 @@ final class FolderStageTests: XCTestCase {
 
         harness.model.setParent(of: mail.id, to: folder.id)
 
-        XCTAssertFalse(harness.model.items.contains { $0.name == "Mail" })
+        XCTAssertTrue(harness.model.items.contains { $0.name == "Mail" }, "still on the wall")
         XCTAssertEqual(harness.model.children(of: folder.id).map(\.name), ["Notes", "Idlery", "Mail"])
+        XCTAssertEqual(harness.model.folderName(containing: mail), "Work")
     }
 }
 

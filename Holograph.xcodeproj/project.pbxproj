@@ -28,6 +28,8 @@
 		3EED5D27BC217F6E21FEA78F /* HoloTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3DC9D2858A257624060AB1 /* HoloTheme.swift */; };
 		4CC03438C803E6DD3D103100 /* PortalLaunchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74BDCEC2B52AF96C7AD47759 /* PortalLaunchOverlay.swift */; };
 		4D44A4FB9FF0677BC1538FC6 /* IconProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14075CEB6D6550F8EB2FCCB /* IconProcessor.swift */; };
+		503A5314BD67B31684ADD1EB /* CalibrationSensing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87556993B98532535828413C /* CalibrationSensing.swift */; };
+		51B6778A8B9AC0F45122FCF3 /* CalibrationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1824B9E91FC8D63981683330 /* CalibrationModel.swift */; };
 		51C725CBD28BC39F4855D38C /* SoundFeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */; };
 		51F818343A8C821F3404AE5F /* IconArtworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D80FD0BFAA16B961B3C401B /* IconArtworkView.swift */; };
 		54555844ED5B16DB8DD09E85 /* ClapListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081E328BEC7E6E6F97C7D726 /* ClapListener.swift */; };
@@ -44,6 +46,7 @@
 		7292FD8356B1C5D5B382BB4F /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */; };
 		72A63C737D47B0B6D9A9A4A5 /* AirGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 903A46D3FE88E555E6032581 /* AirGesture.swift */; };
 		74D4C75B205DC9F06832898C /* LauncherItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38646CD3BC3EABD5F6B43584 /* LauncherItem.swift */; };
+		7511216EBFB4619D650D1ED2 /* bm_george.bin in Resources */ = {isa = PBXBuildFile; fileRef = 59A7D51BA13139B5701F8951 /* bm_george.bin */; };
 		754BFEB9E7C0EC63B71E0F57 /* AirGestureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3209FCECF315CBFC511E3D8 /* AirGestureTests.swift */; };
 		772E85726C888DB5A4FF1744 /* HoloBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71618A3CEE9DEA2F3BB1AC04 /* HoloBrowserView.swift */; };
 		7F7EAF8B848406BEDC90A81B /* StubAppLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */; };
@@ -52,6 +55,7 @@
 		8CF1F164E4189DE9A2612FBD /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = E766AEDBAF4C1E1D67FD5C1C /* ModelContainerFactory.swift */; };
 		9477E227CF3AF0E556BD8DD1 /* LaunchURLValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */; };
 		9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */; };
+		9650B20D7A625F051A40F880 /* Calibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C14DDB235C7D2083558F978 /* Calibration.swift */; };
 		96770D26DE8AEDAD1E4314B4 /* HoloCameraSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6C0E49CF913AF8FC82483F2 /* HoloCameraSource.swift */; };
 		A0651CF85CBA7439BCF5F6C3 /* IconProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E95CFC3A8A102875C9A032 /* IconProcessorTests.swift */; };
 		A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */; };
@@ -59,6 +63,7 @@
 		A8D1B7B0DEBEE97EB1D50CD8 /* AppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A3F0D0074C6D69198C05F4 /* AppearanceUITests.swift */; };
 		A9137CB9727EB64BAF69EF22 /* NeuralSpeechTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5996A44E004EFE4364FFCB66 /* NeuralSpeechTests.swift */; };
 		AB4F2869662119214BE296E9 /* LauncherLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */; };
+		AC8C1F975C3E88DB4DD717D1 /* FolderMembershipPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B33EDCF51CC4D2D8BB7D091 /* FolderMembershipPicker.swift */; };
 		B19DE4E04AD9BD7444632B19 /* HolographicCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */; };
 		B1E567A98B64D4E71DF91452 /* LaunchURLValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2487734BDC72EBA4BF352FE8 /* LaunchURLValidator.swift */; };
 		B834241BE8984ADD4ACC66B5 /* FolderStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E59411F9529A48B460B5AE /* FolderStageTests.swift */; };
@@ -72,11 +77,13 @@
 		D1B4449D8C19CD4AF7BAE369 /* AppStoreLookupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */; };
 		DA5F699FCEB6156D363D69DF /* LauncherScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAD34C8E4FECEB823E33A42 /* LauncherScreen.swift */; };
 		DC40FF39DDC1A617DA982E7C /* HoloMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C099C1ABD945FB3849DC003 /* HoloMotion.swift */; };
+		DC9232669AAB72362D7AFE95 /* CalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3DD8A6D0CA37FF1355949D /* CalibrationView.swift */; };
 		DCB8F952E7AC0137E5F5E43B /* SwiftDataLauncherRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */; };
 		E435AB063BC77B62705EEE41 /* CarouselUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CE3D119D328B3553DE84B8 /* CarouselUITests.swift */; };
 		E6230B7725CBF181FC4B229B /* LauncherViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F055F9E32D7BB9D9BE3A13 /* LauncherViewModelTests.swift */; };
 		F2F44FD4ABD035FB4C718FD8 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */; };
 		F408FF5CD75F691AB46D1FAC /* HapticFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */; };
+		FA46982F7742442D8EB89D94 /* CalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AA63143DDA861E0BF509216 /* CalibrationTests.swift */; };
 		FC3E4452EEEDAA3F654047A1 /* AppEditorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */; };
 		FD2B52B5B6D148E77DFA32A1 /* AppEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */; };
 /* End PBXBuildFile section */
@@ -107,6 +114,7 @@
 		08A3C7DB3A842CB4B81BA98A /* SwiftDataLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLauncherRepository.swift; sourceTree = "<group>"; };
 		0A06365E98CE4387A5697824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0A4DD022D2FDF642181CBEC7 /* StubAppLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubAppLauncher.swift; sourceTree = "<group>"; };
+		1824B9E91FC8D63981683330 /* CalibrationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationModel.swift; sourceTree = "<group>"; };
 		1885AF0C8A1D17F6EC6D0C90 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
 		1A9DA080B4D789F02B83DEF8 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreLookupTests.swift; sourceTree = "<group>"; };
@@ -128,10 +136,13 @@
 		411052B06675BA66A48CA899 /* HoloBrowserPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBrowserPolicy.swift; sourceTree = "<group>"; };
 		45D56F181635003D022467CA /* NeuralSpeech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralSpeech.swift; sourceTree = "<group>"; };
 		4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
+		4B33EDCF51CC4D2D8BB7D091 /* FolderMembershipPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderMembershipPicker.swift; sourceTree = "<group>"; };
 		4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidatorTests.swift; sourceTree = "<group>"; };
 		505B37E8AD6BBE7D77F87D5C /* HoloBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBackgroundView.swift; sourceTree = "<group>"; };
 		507CC239283C8DF6B006FA53 /* LauncherRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherRepositoryTests.swift; sourceTree = "<group>"; };
 		5996A44E004EFE4364FFCB66 /* NeuralSpeechTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralSpeechTests.swift; sourceTree = "<group>"; };
+		59A7D51BA13139B5701F8951 /* bm_george.bin */ = {isa = PBXFileReference; lastKnownFileType = text; path = bm_george.bin; sourceTree = "<group>"; };
+		5C14DDB235C7D2083558F978 /* Calibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calibration.swift; sourceTree = "<group>"; };
 		6038523860A1A525D191193E /* InMemoryLauncherRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryLauncherRepository.swift; sourceTree = "<group>"; };
 		6B05E8252CA570A39D82B82F /* SoundFeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFeedbackTests.swift; sourceTree = "<group>"; };
 		71618A3CEE9DEA2F3BB1AC04 /* HoloBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBrowserView.swift; sourceTree = "<group>"; };
@@ -145,17 +156,20 @@
 		80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorViewModel.swift; sourceTree = "<group>"; };
 		84337AD8D27FCD69AF2C4FC2 /* Holograph.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Holograph.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreURLParserTests.swift; sourceTree = "<group>"; };
+		87556993B98532535828413C /* CalibrationSensing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationSensing.swift; sourceTree = "<group>"; };
 		8A3D1D552712E12F81E1CBBF /* HolographUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HolographUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		903A46D3FE88E555E6032581 /* AirGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirGesture.swift; sourceTree = "<group>"; };
 		96FF28987CEFC8A83D156120 /* HoloBrowserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBrowserTests.swift; sourceTree = "<group>"; };
 		9795AB2394722BC0A465035C /* DemoContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContentTests.swift; sourceTree = "<group>"; };
 		9957C9972D94EB8CED4C8548 /* LaunchEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchEnvironment.swift; sourceTree = "<group>"; };
+		9AA63143DDA861E0BF509216 /* CalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationTests.swift; sourceTree = "<group>"; };
 		9C099C1ABD945FB3849DC003 /* HoloMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloMotion.swift; sourceTree = "<group>"; };
 		A0603960309D684C8F2F3DFC /* LauncherLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherLibraryTests.swift; sourceTree = "<group>"; };
 		A484FD65121E780E48A76D30 /* SelectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionStore.swift; sourceTree = "<group>"; };
 		AA30B9289A63ECC7961F9CA5 /* LauncherLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherLayout.swift; sourceTree = "<group>"; };
 		B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEditorViewModelTests.swift; sourceTree = "<group>"; };
 		B19529D587E01BB8D5DF09DE /* LoadingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingScreen.swift; sourceTree = "<group>"; };
+		BA3DD8A6D0CA37FF1355949D /* CalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationView.swift; sourceTree = "<group>"; };
 		BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselGeometryTests.swift; sourceTree = "<group>"; };
 		BC12E2F5145D224457882A85 /* HolographTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HolographTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BDAD34C8E4FECEB823E33A42 /* LauncherScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LauncherScreen.swift; sourceTree = "<group>"; };
@@ -261,6 +275,7 @@
 			isa = PBXGroup;
 			children = (
 				FC04AA4F63CFAAF33B68E561 /* Browser */,
+				FF0DF7B0417386BC61D9FB45 /* Calibration */,
 				C2473825B013DE51CE6BB0F9 /* Folders */,
 				68C4EB41F6E412702F128E32 /* Holographic */,
 				DC0C6C128311E80842BB103E /* Launcher */,
@@ -276,6 +291,15 @@
 				71618A3CEE9DEA2F3BB1AC04 /* HoloBrowserView.swift */,
 			);
 			path = Browser;
+			sourceTree = "<group>";
+		};
+		FF0DF7B0417386BC61D9FB45 /* Calibration */ = {
+			isa = PBXGroup;
+			children = (
+				1824B9E91FC8D63981683330 /* CalibrationModel.swift */,
+				BA3DD8A6D0CA37FF1355949D /* CalibrationView.swift */,
+			);
+			path = Calibration;
 			sourceTree = "<group>";
 		};
 		C2473825B013DE51CE6BB0F9 /* Folders */ = {
@@ -318,6 +342,7 @@
 			children = (
 				F9BD107299BD02DB1FA37AA4 /* AppEditorView.swift */,
 				80F6060A0E4B273123E03CD2 /* AppEditorViewModel.swift */,
+				4B33EDCF51CC4D2D8BB7D091 /* FolderMembershipPicker.swift */,
 				F26A81DEBC907D053E1CB9F0 /* SettingsSheet.swift */,
 			);
 			path = Settings;
@@ -347,6 +372,7 @@
 			isa = PBXGroup;
 			children = (
 				0A06365E98CE4387A5697824 /* Assets.xcassets */,
+				59A7D51BA13139B5701F8951 /* bm_george.bin */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -358,6 +384,8 @@
 				C5059B443A7FC5D456320C66 /* AppLaunching.swift */,
 				1CCE63E88CC6AA100F3AAD8E /* AppStoreLookupService.swift */,
 				784B787FA1BDA942E140E279 /* AppStoreURLParser.swift */,
+				5C14DDB235C7D2083558F978 /* Calibration.swift */,
+				87556993B98532535828413C /* CalibrationSensing.swift */,
 				D66B4483A3915E44E018C2D0 /* CameraAirGestureSource.swift */,
 				081E328BEC7E6E6F97C7D726 /* ClapListener.swift */,
 				4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */,
@@ -391,6 +419,7 @@
 				B0FB36C8A657DA01109F9771 /* AppEditorViewModelTests.swift */,
 				1AF5F388F87BE6901E1E188E /* AppStoreLookupTests.swift */,
 				86B372235DB3C341AE4C6832 /* AppStoreURLParserTests.swift */,
+				9AA63143DDA861E0BF509216 /* CalibrationTests.swift */,
 				BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */,
 				FD0642883F157625C4F18412 /* ClapDetectorTests.swift */,
 				9795AB2394722BC0A465035C /* DemoContentTests.swift */,
@@ -525,6 +554,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0888778AE4AC523479E82C0E /* Assets.xcassets in Resources */,
+				7511216EBFB4619D650D1ED2 /* bm_george.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -557,11 +587,16 @@
 				0FFCF3D438E872A9C282A35C /* AppServices.swift in Sources */,
 				D1B4449D8C19CD4AF7BAE369 /* AppStoreLookupService.swift in Sources */,
 				9481C035FC7DDE9C4F0B3F39 /* AppStoreURLParser.swift in Sources */,
+				9650B20D7A625F051A40F880 /* Calibration.swift in Sources */,
+				51B6778A8B9AC0F45122FCF3 /* CalibrationModel.swift in Sources */,
+				503A5314BD67B31684ADD1EB /* CalibrationSensing.swift in Sources */,
+				DC9232669AAB72362D7AFE95 /* CalibrationView.swift in Sources */,
 				5C98C499E9362BC4A220CB40 /* CameraAirGestureSource.swift in Sources */,
 				54555844ED5B16DB8DD09E85 /* ClapListener.swift in Sources */,
 				807497263DE17FA364CE9B42 /* DemoContent.swift in Sources */,
 				6CF5C3AD16DF011A142E4538 /* DemoIconArtwork.swift in Sources */,
 				19A2718C7151CA2EA73485E4 /* EmptyLauncherView.swift in Sources */,
+				AC8C1F975C3E88DB4DD717D1 /* FolderMembershipPicker.swift in Sources */,
 				BB53392D18FD134D5FA948FC /* FolderStageView.swift in Sources */,
 				F408FF5CD75F691AB46D1FAC /* HapticFeedback.swift in Sources */,
 				CBF6A81747C7729CE7605D7F /* HeadTracking.swift in Sources */,
@@ -609,6 +644,7 @@
 				FC3E4452EEEDAA3F654047A1 /* AppEditorViewModelTests.swift in Sources */,
 				13277315FA1595FAD68DB32C /* AppStoreLookupTests.swift in Sources */,
 				A2B6BA2F38E1F2E2DA648C4F /* AppStoreURLParserTests.swift in Sources */,
+				FA46982F7742442D8EB89D94 /* CalibrationTests.swift in Sources */,
 				0F2C5B1B7CEB89591D8F6721 /* CarouselGeometryTests.swift in Sources */,
 				2A5E17814F42868D716CC55E /* ClapDetectorTests.swift in Sources */,
 				0EBCF848064C6917F8E44750 /* DemoContentTests.swift in Sources */,

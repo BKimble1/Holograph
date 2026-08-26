@@ -18,6 +18,9 @@ struct SettingsSheet: View {
     @AppStorage(SoundPreferences.spokenLaunchKey) private var spokenLaunchEnabled = true
 
     @State private var pendingDelete: LauncherItem?
+    /// Which folder's "add things to me" picker is open.
+    @State private var addingToFolder: LauncherItem?
+    @State private var isCalibrating = false
     @State private var isConfirmingRemoveAll = false
     @State private var testLaunchResult: TestLaunchResult?
 
@@ -32,6 +35,7 @@ struct SettingsSheet: View {
                 airGestureSection
                 headTrackingSection
                 clapSection
+                calibrationSection
                 soundSection
                 maintenanceSection
                 aboutSection
@@ -59,6 +63,18 @@ struct SettingsSheet: View {
         .presentationDetents([.large])
         .accessibilityIdentifier(AccessibilityID.settingsSheet)
         .onAppear(perform: applyInitialRoute)
+        .sheet(isPresented: $isCalibrating) {
+            CalibrationSheet()
+                .environment(services)
+                .environment(model)
+        }
+        .sheet(item: $addingToFolder) { folder in
+            FolderMembershipPicker(
+                folder: folder,
+                candidates: model.allItems.addableToFolder(folder.id),
+                onAdd: { model.setParent(of: $0.id, to: folder.id) }
+            )
+        }
         .alert(
             "Delete \(pendingDelete?.name ?? "app")?",
             isPresented: Binding(
@@ -130,32 +146,50 @@ struct SettingsSheet: View {
             if contents.isEmpty {
                 Text(folder == nil
                      ? "Nothing here yet. Add an app or a website to fill the launcher."
-                     : "This folder is empty. Use an item’s menu to move it in here.")
+                     : "This folder is empty.")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(contents) { item in
-                    row(for: item)
+                    row(for: item, inFolder: folder)
                 }
                 .onMove { source, destination in
                     model.move(fromOffsets: source, toOffset: destination, in: folder?.id)
                 }
                 .onDelete { offsets in
                     guard let index = offsets.first, contents.indices.contains(index) else { return }
-                    pendingDelete = contents[index]
+                    if let folder {
+                        // Inside a folder, swiping takes it *out of the folder*
+                        // rather than deleting it. The tile still exists — it is
+                        // on the wall, where it always was.
+                        model.setParent(of: contents[index].id, to: nil)
+                        _ = folder
+                    } else {
+                        pendingDelete = contents[index]
+                    }
                 }
+            }
+
+            if let folder {
+                Button {
+                    addingToFolder = folder
+                } label: {
+                    Label("Add to \(folder.name)", systemImage: "plus.circle")
+                }
+                .disabled(model.allItems.addableToFolder(folder.id).isEmpty)
+                .accessibilityIdentifier(AccessibilityID.addToFolder)
             }
         } header: {
             Text(folder?.name ?? "Main Launcher")
         } footer: {
             if folder == nil {
-                Text("Drag to reorder, or use each item’s menu. The order here is the order on the launcher.")
+                Text("Everything you have added, in the order the launcher shows it. Drag to reorder.")
             } else {
-                Text("Deleting this folder puts everything in it back on the main launcher — nothing inside is lost.")
+                Text("Things in a folder stay on the main launcher too — a folder is a second way to reach them, not a drawer they disappear into. Swipe to take one out; deleting the folder just removes the grouping.")
             }
         }
     }
 
-    private func row(for item: LauncherItem) -> some View {
+    private func row(for item: LauncherItem, inFolder folder: LauncherItem? = nil) -> some View {
         HStack(spacing: 14) {
             IconArtworkView(item: item, size: 44)
                 .overlay {
@@ -169,6 +203,12 @@ struct SettingsSheet: View {
                         .font(.body)
                     badge(item.kind.noun.uppercased())
                     if item.isDemo { badge("DEMO") }
+                    // On the wall, say which folder something is also in. It is
+                    // in both places, and that is easier to believe when the
+                    // list says so.
+                    if folder == nil, let name = model.folderName(containing: item) {
+                        badge(name.uppercased())
+                    }
                 }
                 Text(item.subtitle(folderCount: model.itemCount(inFolder: item.id)))
                     .font(.caption)
@@ -199,7 +239,7 @@ struct SettingsSheet: View {
             .foregroundStyle(HoloTheme.cyanBright)
     }
 
-    private func rowMenu(for item: LauncherItem) -> some View {
+    private func rowMenu(for item: LauncherItem, inFolder folder: LauncherItem? = nil) -> some View {
         Menu {
             Button {
                 editorTarget = .edit(item)
@@ -216,27 +256,36 @@ struct SettingsSheet: View {
                 }
             }
 
-            // Where it lives. Folders are never inside anything, so they are
-            // the one kind this does not offer.
+            // Which folder it is grouped under, if any. Folders are never
+            // inside anything, so they are the one kind this does not offer.
             if !item.isFolder, !model.allItems.folders.isEmpty {
                 Menu {
-                    Button("Main Launcher") { model.setParent(of: item.id, to: nil) }
+                    Button("No Folder") { model.setParent(of: item.id, to: nil) }
                         .disabled(item.parentFolderID == nil)
-                    ForEach(model.allItems.folders) { folder in
-                        Button(folder.name) { model.setParent(of: item.id, to: folder.id) }
-                            .disabled(item.parentFolderID == folder.id)
+                    ForEach(model.allItems.folders) { candidate in
+                        Button(candidate.name) { model.setParent(of: item.id, to: candidate.id) }
+                            .disabled(item.parentFolderID == candidate.id)
                     }
                 } label: {
-                    Label("Move To…", systemImage: "folder")
+                    Label("Add to Folder…", systemImage: "folder.badge.plus")
                 }
+            }
+
+            if let folder, item.parentFolderID == folder.id {
+                Button {
+                    model.setParent(of: item.id, to: nil)
+                } label: {
+                    Label("Remove from \(folder.name)", systemImage: "folder.badge.minus")
+                }
+                .accessibilityIdentifier(AccessibilityID.removeFromFolder(item.name))
             }
 
             // Reordering happens within the item's own scope: moving something
             // up inside a folder must not shuffle the wall behind it.
-            let scope = item.parentFolderID.map { model.children(of: $0) } ?? model.allItems.rootItems
+            let scope = folder.map { model.children(of: $0.id) } ?? model.allItems.rootItems
             if let index = scope.firstIndex(where: { $0.id == item.id }) {
                 Button {
-                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1, in: item.parentFolderID)
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1, in: folder?.id)
                 } label: {
                     Label("Move Up", systemImage: "arrow.up")
                 }
@@ -244,7 +293,7 @@ struct SettingsSheet: View {
                 .accessibilityIdentifier(AccessibilityID.appRowMoveUp(item.name))
 
                 Button {
-                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2, in: item.parentFolderID)
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2, in: folder?.id)
                 } label: {
                     Label("Move Down", systemImage: "arrow.down")
                 }
@@ -380,6 +429,24 @@ struct SettingsSheet: View {
         #endif
     }
 
+    /// One place to tune all three of the things that watch or listen. Its own
+    /// section rather than a row inside each feature: calibrating is worth
+    /// doing once, for everything, rather than three times in three places.
+    private var calibrationSection: some View {
+        Section {
+            Button {
+                isCalibrating = true
+            } label: {
+                Label("Calibrate to You", systemImage: "slider.horizontal.3")
+            }
+            .accessibilityIdentifier(AccessibilityID.calibration)
+        } header: {
+            Text("Calibration")
+        } footer: {
+            Text("Three short exercises — a few flicks, a look around the screen, a few claps — and Holograph adjusts its thresholds to how you actually move and sound rather than to an average. Nothing is recorded; each exercise measures a handful of numbers and keeps only those.")
+        }
+    }
+
     /// Read straight from defaults by the sound service at the point of use, so
     /// flipping either of these takes effect on the very next tick.
     private var soundSection: some View {
@@ -450,7 +517,7 @@ struct SettingsSheet: View {
         case .folder:
             let count = model.itemCount(inFolder: item.id)
             guard count > 0 else { return "\(item.name) will be removed. It is empty." }
-            return "\(item.name) will be removed. The \(count == 1 ? "item" : "\(count) items") inside it move back to the main launcher — nothing is deleted."
+            return "\(item.name) will be removed. The \(count == 1 ? "item" : "\(count) items") grouped under it stay on the main launcher — only the grouping goes."
         case .website:
             return "\(item.name) will be removed from your launcher. The website itself is unaffected."
         case .app:
