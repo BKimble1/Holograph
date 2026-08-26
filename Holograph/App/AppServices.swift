@@ -118,10 +118,15 @@ struct AppComposition {
         calibration = InertCalibrationSensor()
         #endif
 
-        // The launch voice is a local neural model. Tests never load it: the
-        // weights are larger than the rest of the app, and a unit suite that
-        // waits for Core ML is a unit suite nobody runs.
-        let speech: NeuralSpeaking = staysQuiet ? StubNeuralSpeech() : KokoroSpeechEngine()
+        // The launch voice, in two layers. The neural model speaks when a
+        // build ships one; the system's British voice speaks when it does not,
+        // which is what makes a fresh download talk without being set up
+        // first. Tests get neither: the weights are larger than the rest of
+        // the app, and a unit suite that waits for Core ML is a unit suite
+        // nobody runs.
+        let speech: NeuralSpeaking = staysQuiet
+            ? StubNeuralSpeech()
+            : LayeredSpeech(preferred: KokoroSpeechEngine(), fallback: SystemVoiceSpeechEngine())
         let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound(speech: speech)
         // The launcher's own tick and its voice come out of the same speaker the
         // microphone is pointed at, and two ticks in a second read as a perfectly

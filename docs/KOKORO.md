@@ -1,8 +1,14 @@
 # The launch voice: Kokoro-82M, locally
 
-Holograph speaks each launch — "Opening Truebearing" — with a neural voice that
-runs entirely on the iPad. This note says exactly what is used, where the model
-lives, and what has to be done to provision it.
+Holograph speaks each launch — "Opening Truebearing" — with a voice that runs
+entirely on the iPad. This note says exactly what the neural voice is, where the
+model lives, and what has to be done to provision it.
+
+> **The voice works without any of this.** Speech is layered: `LayeredSpeech`
+> prefers Kokoro and falls back to the system's British voice, so a fresh
+> install speaks the first time it is asked to with nothing downloaded and
+> nothing switched on. Everything below is about the *better* voice, not about
+> whether there is one. See "Speech is layered" in the README.
 
 ## What is used
 
@@ -20,18 +26,36 @@ The voice is chosen for the character the launcher wants: calm, level,
 unhurried, a shade deep. It is a Holograph voice. Nothing here clones, imitates,
 trains on or attempts to reproduce any real person.
 
-## Why it is not in this repository
+## What is in this repository, and what is not
 
-Kokoro's weights are tens of megabytes even compiled, and a git repository is
-the wrong place for them:
+**`bm_george.bin` is committed** — 522,240 bytes, the 510 × 256 style block —
+and ships in the app bundle. It is small enough to belong here.
 
-- they would be committed to every clone forever,
-- they are not source, and they are not reviewed as source,
-- and the project's own CI must not download them to run unit tests.
+**The Core ML weights are not**, for a reason that is specific rather than
+stylistic: the smallest useful Kokoro-82M export is about 160 MB, and GitHub
+refuses any single file over 100 MB. Committing it would mean sharding it into
+ten parts and reassembling them in a build phase, which puts a step that can
+fail between every clone and a working build. So the repository contains the
+**integration**, and the model is provisioned separately. `HolographTests`
+exercises the whole speech path against `StubNeuralSpeech`; the real model is a
+device concern.
 
-So the repository contains the **integration**, and the model is provisioned
-separately. `HolographTests` exercises the whole speech path against
-`StubNeuralSpeech`; the real model is a device concern.
+### Where the weights can be got
+
+The upstream weights live on Hugging Face
+(`hexgrad/Kokoro-82M`, and `onnx-community/Kokoro-82M-v1.0-ONNX` for the ONNX
+export), Apache-2.0 in both cases. The ONNX export is also republished on npm as
+`kokoro-fp16-shards` (163 MB across ten parts, Apache-2.0), which is useful in
+environments where Hugging Face is unreachable.
+
+Getting from there to `Kokoro.mlmodelc` still needs a conversion pass — the ONNX
+graph uses `STFT`, `NonZero` and six `LSTM`s, none of which map cleanly onto
+Core ML MIL, so the practical route is the PyTorch source through
+`coremltools`, splitting the vocoder out as its own model. `mattmireles/kokoro-coreml`
+is a working pipeline for exactly that. **Whatever route is used, the resulting
+`.mlpackage` must be verified on a real device before it ships** — a model that
+loads but decodes wrongly is worse than no model, because the fallback would
+have spoken.
 
 ## Where the app looks
 
@@ -45,9 +69,11 @@ separately. `HolographTests` exercises the whole speech path against
 Both are read from disk. Neither path involves the network.
 
 If either file is missing, `KokoroSpeechEngine.isReady` is `false`,
-`unavailableReason` explains which piece is missing, launch announcements are
-skipped and logged, and **the launcher behaves exactly as it otherwise would**.
-A spoken launch is a decoration and is never allowed to become a dependency.
+`unavailableReason` records which piece is missing, and `LayeredSpeech` moves on
+to the system voice — so the user hears a launch announced either way and
+Settings shows nothing. **The launcher behaves exactly as it otherwise would.**
+A spoken launch is a decoration and is never allowed to become a dependency;
+Settings only ever reports a problem when *nothing* on the iPad can speak.
 
 ## Files expected
 
@@ -77,6 +103,10 @@ IPA larger but means the voice works on first run with nothing to download.
 download is deliberately *not* implemented here, so that no build of Holograph
 ever contacts a host this repository cannot verify.
 
+Either way the transition is silent from the user's side. Before provisioning
+the system voice speaks; afterwards Kokoro does; nothing has to be enabled and
+no setting changes.
+
 ## Licence obligations
 
 Kokoro-82M is Apache-2.0. A build that ships the weights must include the
@@ -92,7 +122,9 @@ Once provisioned:
 1. Settings → Sound → **Say the App Name** is on.
 2. Open the app; the engine warms in the background once the launcher is usable.
 3. Tap a tile. The first announcement may arrive slightly late if it was not
-   pre-rendered; every subsequent one is instant, from the cache.
+   pre-rendered; every subsequent one is instant, from the cache. Check the log
+   for `neural voice ready` rather than `system voice ready` — both speak, and
+   the point of this exercise is to confirm *which* one did.
 4. Rename a tile and open it again — it should say the new name.
 5. Turn on clap-to-open and open something. The announcement must not trigger a
    clap; the listener is muted for the phrase's measured duration.

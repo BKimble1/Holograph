@@ -11,13 +11,15 @@ final class FolderStageTests: XCTestCase {
             LauncherItem(kind: .app, name: "Mail", launchURL: URL(string: "mail://x"), sortOrder: 0),
             folder,
             LauncherItem(kind: .app, name: "Slides", launchURL: URL(string: "slides://x"), sortOrder: 2),
+            // In a folder *and* on the wall, so each carries both positions:
+            // where it sits on the wall, and where it sits inside "Work".
             LauncherItem(
                 kind: .app, name: "Notes", launchURL: URL(string: "notes://x"),
-                parentFolderID: folder.id, sortOrder: 0
+                parentFolderID: folder.id, sortOrder: 3, folderSortOrder: 0
             ),
             LauncherItem(
                 kind: .website, name: "Idlery", launchURL: URL(string: "https://idlery.com"),
-                parentFolderID: folder.id, sortOrder: 1
+                parentFolderID: folder.id, sortOrder: 4, folderSortOrder: 1
             ),
         ]
         return (folder, items)

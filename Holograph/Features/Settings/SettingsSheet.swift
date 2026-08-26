@@ -461,9 +461,10 @@ struct SettingsSheet: View {
             }
             .accessibilityIdentifier(AccessibilityID.spokenLaunch)
 
-            // A switch that is on while nothing happens looks broken. If the
-            // neural voice is not installed, say so here rather than leaving
-            // the user with unexplained silence.
+            // A switch that is on while nothing happens looks broken. This
+            // only ever appears when *nothing* on the iPad can speak — a
+            // missing neural model is not shown, because the system voice is
+            // already speaking and the user has no silence to explain.
             if spokenLaunchEnabled, let reason = services.sound.spokenLaunchUnavailableReason {
                 Label(reason, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
@@ -473,7 +474,7 @@ struct SettingsSheet: View {
         } header: {
             Text("Sound")
         } footer: {
-            Text("A tick as the carousel moves, and “Opening…” spoken as an app or website opens. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing. Folders open silently: they are not going anywhere.\n\nThe voice is a neural one that runs entirely on this iPad. Nothing is sent anywhere, no account or connection is involved, and no system voice needs installing.")
+            Text("A tick as the carousel moves, and “Opening…” spoken as an app or website opens. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing. Folders open silently: they are not going anywhere.\n\nThe voice works the moment you install Holograph, with nothing to download and nothing to switch on. It runs entirely on this iPad: nothing is sent anywhere, and no account or connection is involved.")
         }
     }
 

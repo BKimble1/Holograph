@@ -275,3 +275,154 @@ final class SpokenLaunchTests: XCTestCase {
         }
     }
 }
+
+/// Which voice a stock iPad ends up speaking with.
+///
+/// The ladder exists so that no device can fall off the end of it, which is the
+/// property worth testing: every case here has to produce a voice.
+final class SystemVoiceCatalogueTests: XCTestCase {
+    private func voice(
+        _ name: String,
+        _ language: String,
+        quality: Int = 0,
+        male: Bool = true
+    ) -> SystemVoiceDescriptor {
+        SystemVoiceDescriptor(
+            identifier: "id.\(name).\(language)",
+            name: name,
+            language: language,
+            quality: quality,
+            isMale: male
+        )
+    }
+
+    func testABritishManIsPreferredOverEverythingElse() {
+        let chosen = SystemVoiceCatalogue.best(from: [
+            voice("Samantha", "en-US", quality: 2, male: false),
+            voice("Aaron", "en-US", quality: 2),
+            voice("Kate", "en-GB", quality: 2, male: false),
+            voice("Daniel", "en-GB"),
+        ])
+        XCTAssertEqual(chosen?.name, "Daniel", "accent and gender both, even at lower quality")
+    }
+
+    func testTheBestBritishManWinsAmongSeveral() {
+        let chosen = SystemVoiceCatalogue.best(from: [
+            voice("Daniel", "en-GB", quality: 0),
+            voice("Oliver", "en-GB", quality: 2),
+            voice("Arthur", "en-GB", quality: 1),
+        ])
+        XCTAssertEqual(chosen?.name, "Oliver")
+    }
+
+    func testAnAccentBeatsAGender() {
+        // A British woman is closer to the launcher's register than an
+        // American man is.
+        let chosen = SystemVoiceCatalogue.best(from: [
+            voice("Aaron", "en-US", quality: 2),
+            voice("Kate", "en-GB", quality: 0, male: false),
+        ])
+        XCTAssertEqual(chosen?.name, "Kate")
+    }
+
+    func testAnyEnglishWillDoWhenThereIsNoBritishVoice() {
+        let chosen = SystemVoiceCatalogue.best(from: [
+            voice("Amélie", "fr-CA", quality: 2, male: false),
+            voice("Samantha", "en-US", quality: 1, male: false),
+        ])
+        XCTAssertEqual(chosen?.name, "Samantha")
+    }
+
+    func testSomethingIsChosenEvenWithNoEnglishAtAll() {
+        let chosen = SystemVoiceCatalogue.best(from: [
+            voice("Amélie", "fr-CA", quality: 1, male: false),
+        ])
+        XCTAssertEqual(chosen?.name, "Amélie", "there is no rung that says install something first")
+    }
+
+    func testOnlyAnEmptyDeviceComesUpEmpty() {
+        XCTAssertNil(SystemVoiceCatalogue.best(from: []))
+    }
+
+    func testTheChoiceIsStableAcrossLaunches() {
+        // Two equally good candidates must not alternate: a voice that changes
+        // between launches sounds like a fault.
+        let candidates = [voice("Daniel", "en-GB", quality: 1), voice("Arthur", "en-GB", quality: 1)]
+        let first = SystemVoiceCatalogue.best(from: candidates)
+        let second = SystemVoiceCatalogue.best(from: candidates.reversed())
+        XCTAssertEqual(first, second)
+    }
+
+    func testKnownMaleNamesAreRecognisedWithOrWithoutASuffix() {
+        XCTAssertTrue(SystemVoiceCatalogue.isProbablyMale(name: "Daniel"))
+        XCTAssertTrue(SystemVoiceCatalogue.isProbablyMale(name: "Daniel (Enhanced)"))
+        XCTAssertFalse(SystemVoiceCatalogue.isProbablyMale(name: "Serena"))
+    }
+}
+
+/// The neural voice in front, the system voice behind, and never silence
+/// because of which one a build happens to ship.
+@MainActor
+final class LayeredSpeechTests: XCTestCase {
+    func testThePreferredEngineSpeaksWhenItCan() async {
+        let preferred = StubNeuralSpeech()
+        let fallback = StubNeuralSpeech()
+        let speech = LayeredSpeech(preferred: preferred, fallback: fallback)
+
+        await speech.prepare()
+        let rendered = await speech.render("Opening Mail")
+
+        XCTAssertNotNil(rendered)
+        XCTAssertEqual(preferred.rendered, ["Opening Mail"])
+        XCTAssertEqual(fallback.rendered, [], "the fallback is not even asked")
+        XCTAssertTrue(speech.usingPreferred)
+    }
+
+    func testTheFallbackSpeaksWhenTheModelIsNotInstalled() async {
+        let preferred = StubNeuralSpeech(isReady: false, unavailableReason: "not installed")
+        let fallback = StubNeuralSpeech()
+        let speech = LayeredSpeech(preferred: preferred, fallback: fallback)
+
+        await speech.prepare()
+        let rendered = await speech.render("Opening Mail")
+
+        XCTAssertNotNil(rendered, "a fresh download still talks")
+        XCTAssertEqual(fallback.rendered, ["Opening Mail"])
+        XCTAssertFalse(speech.usingPreferred)
+    }
+
+    func testAMissingModelIsNotReportedWhileSomethingIsStillSpeaking() async {
+        let speech = LayeredSpeech(
+            preferred: StubNeuralSpeech(isReady: false, unavailableReason: "not installed"),
+            fallback: StubNeuralSpeech()
+        )
+        await speech.prepare()
+
+        XCTAssertTrue(speech.isReady)
+        XCTAssertNil(speech.unavailableReason, "the user has no silence to explain")
+    }
+
+    func testOnlyTotalSilenceIsReported() async {
+        let speech = LayeredSpeech(
+            preferred: StubNeuralSpeech(isReady: false, unavailableReason: "no model"),
+            fallback: StubNeuralSpeech(isReady: false, unavailableReason: "no voices")
+        )
+        await speech.prepare()
+
+        XCTAssertFalse(speech.isReady)
+        XCTAssertEqual(speech.unavailableReason, "no voices", "the nearer failure is the useful one")
+        let rendered = await speech.render("Opening Mail")
+        XCTAssertNil(rendered)
+    }
+
+    func testBothEnginesArePreparedSoTheFallbackIsReadyTheMomentItIsNeeded() async {
+        let preferred = StubNeuralSpeech()
+        let fallback = StubNeuralSpeech()
+        let speech = LayeredSpeech(preferred: preferred, fallback: fallback)
+
+        await speech.prepare()
+
+        XCTAssertEqual(preferred.prepareCount, 1)
+        XCTAssertEqual(fallback.prepareCount, 1)
+    }
+}

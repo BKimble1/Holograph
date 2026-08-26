@@ -227,6 +227,58 @@ only thing that leaves the detector is a gesture.
 
 ---
 
+## Calibration
+
+Every threshold above is an average of people. **Settings → Calibrate to You**
+replaces the ones that vary most with measurements of you: three short
+exercises, a minute in total, and nothing kept but a handful of numbers.
+
+The design rule throughout is that a calibration must never be able to make the
+launcher *worse*. Each exercise measures, takes a robust statistic rather than a
+best or worst case, applies a safety margin in the forgiving direction, and
+clamps the result to a range the detector is known to work in. A run that goes
+badly — a hand out of frame, a quiet room, three claps that were really one —
+lands on the clamp, which is roughly where the default already was.
+
+| Exercise | What you do | What it measures | What it sets |
+| --- | --- | --- | --- |
+| **Hand** | Three flicks left and right, at your distance | Peak speed and travel of each flick | `flickStartSpeed`, `flickTravelSpans` |
+| **Face** | Look around the screen — corner to corner | How far your head actually moves in frame | `headRange` |
+| **Clap** | Three double claps, at your volume | Level of the quietest clap, widest gap between the pair | `clapLevel`, `clapMaximumGap` |
+
+**Why medians, and why those margins.** A calibration set from your *fastest*
+flick would refuse every ordinary one; set from your slowest it would fire on a
+wave. The hand exercise therefore takes the **median** peak speed of the flicks
+it saw and keeps **45%** of it, and the median travel and keeps **55%** — so an
+average flick clears the bar with room to spare, and an unusually lazy one still
+does. The clap exercise works from the **quietest** clap rather than the median,
+because a threshold above your quietest clap is a threshold that misses claps,
+and takes another **6 dB** off it; the gap between the two claps takes the
+**widest** you produced and adds **35%**. Head range weights horizontal movement
+over vertical (0.7 / 0.3, because that is the axis the effect is mostly built
+from), halves it to a per-side figure, and keeps 80%.
+
+Three flicks and three double claps is deliberate: enough for a median to mean
+something, few enough that people actually finish. The flow simply keeps
+listening until it has three good ones and shows each as it lands, so you can
+see it working rather than guessing. The face exercise is different in kind — it
+wants coverage, not repetitions — so it collects 45 readings while you look
+around and takes the extent of where your head went.
+
+The maths is pure and lives in `Calibration.swift` — `HandCalibrator`,
+`HeadCalibrator`, `ClapCalibrator` — with no camera, microphone or UI anywhere
+near it, which is why it is all directly unit tested, clamps included.
+`CalibrationProfile` is a small `Codable` struct of optionals; anything not
+measured keeps its default, and **Reset** removes the file. `applying(_:)` on
+each detector's `Thresholds` is where a profile turns into behaviour, and it is
+the only place that can, so there is exactly one thing to test.
+
+Sensing during calibration goes through the same `HoloCameraSource` as
+everything else, as a third consumer alongside gestures and head tracking, with
+raw readings switched on for the duration. Nothing is recorded.
+
+---
+
 ## Sound
 
 Two accents, both on by default and both switchable in Settings:
@@ -261,16 +313,42 @@ Everything is best-effort: a device that cannot play simply stays quiet.
 
 ### The launch voice
 
-Spoken launches use **Kokoro-82M**, an Apache-2.0 neural text-to-speech model,
-run locally with Core ML. The voice is Kokoro's British male **`bm_george`**,
-at a speech rate of 0.94 — calm, level, and a shade slower than default. It is a
-Holograph voice, not an impersonation of anybody.
+The voice speaks the moment Holograph is installed. Nothing is downloaded,
+nothing is provisioned, and nothing has to be switched on — which is the whole
+requirement, and the reason it is built in two layers rather than one.
 
-Everything about synthesis is on-device by construction. `KokoroSpeechEngine`
-reads a compiled model and a style vector from disk and runs `MLModel`; there is
-no endpoint, no key and no request, and a unit test scans those sources to make
-sure it stays that way. No system voice needs installing, and the old
-instruction to download Apple's Daniel is gone.
+`LayeredSpeech` holds a preferred engine and a fallback, prepares both, asks the
+preferred one first, and drops to the fallback the instant it cannot answer —
+not installed, failed to load, or simply nothing rendered for one awkward
+phrase. Callers never learn which one spoke.
+
+- **Preferred: Kokoro-82M**, an Apache-2.0 neural model run locally with Core
+  ML, in Kokoro's British male **`bm_george`** at a speech rate of 0.94. It
+  speaks whenever a build ships the model. It is a Holograph voice, not an
+  impersonation of anybody.
+- **Fallback: the system's own British voice.** `SystemVoiceCatalogue` picks
+  the closest match to that register from what the iPad already has, in a ladder
+  that cannot come up empty: the best-quality British male voice, else any
+  British voice, else any English one, else the system default. On a stock iPad
+  that is Daniel. Ties break on identifier, so the voice never changes between
+  launches — a voice that did would sound like a fault.
+
+The fallback renders through `AVSpeechSynthesizer.write(_:toBufferCallback:)`
+rather than by speaking directly, so its samples travel the same path as every
+other sound the launcher makes: the same caching, the same ducking, the same
+silent-switch behaviour, and the same microphone hold-off that stops the
+launcher's own voice being heard as a clap.
+
+Settings reports a problem only when **nothing at all** can speak. A missing
+neural model is not a state the user experiences while a voice is still
+talking, and saying so would be describing our packaging rather than their
+iPad.
+
+Everything about synthesis is on-device by construction — both layers.
+`KokoroSpeechEngine` reads a compiled model and a style vector from disk and
+runs `MLModel`, and `AVSpeechSynthesizer` renders locally; there is no endpoint,
+no key and no request, and a unit test scans those sources to make sure it stays
+that way.
 
 Latency is treated as the point rather than an afterthought:
 
@@ -286,11 +364,13 @@ Latency is treated as the point rather than an afterthought:
 - If the voice fails to load, the announcement is skipped and logged. It is a
   decoration and is never allowed to become a dependency.
 
-**Model files.** The weights are not committed to this repository and are not
-in the app bundle. `KokoroModelStore` looks in the app bundle first, then in
-`Application Support/Kokoro/`, for `Kokoro.mlmodelc` and `bm_george.bin`. Until
-those are provisioned, spoken launch stays silent and Settings says why. See
-[`docs/KOKORO.md`](docs/KOKORO.md).
+**Model files.** `bm_george.bin`, the 510 × 256 style vector, *is* committed and
+shipped in the bundle. The Core ML weights are not: `Kokoro.mlmodelc` is 160 MB
+in the smallest useful precision, which is past GitHub's 100 MB per-file limit
+and would have to be sharded and reassembled at build time. `KokoroModelStore`
+looks in the app bundle first, then in `Application Support/Kokoro/`. Until the
+model is provisioned the system voice speaks instead, which is why nothing about
+this is visible to the user. See [`docs/KOKORO.md`](docs/KOKORO.md).
 
 ---
 
@@ -309,6 +389,23 @@ at its edge, a hard clamp, and a fade rather than a snap when the viewer leaves.
 Where you were sitting when the camera first saw you counts as straight on, so
 using an iPad from an armchair off to one side does not mean a permanently
 tilted scene.
+
+**Why it used to look glitchy, and what fixed it.** The camera delivers about 30
+frames a second; the display draws 60 to 120. No amount of filtering at the
+source can fix that, because the source is simply not producing a value for
+every frame drawn — the scene holds still, jumps, holds still, jumps, and reads
+as stepping rather than moving. Each new reading is therefore handed to a short
+critically-damped spring (0.14 s, no bounce) and the display interpolates
+between readings instead of waiting for them. The filter removes the noise; the
+spring removes the stair-step. They are two different problems and needed two
+different fixes.
+
+**And it moves further.** The range that counts as a full turn of the head came
+down to 0.17 of the frame, so an ordinary shift in a chair reaches most of the
+effect rather than a tenth of it, and the dead zone came down to 0.05 with it.
+The wall itself travels 46 points and rotates up to 9°, with 5° of vertical
+tilt; the background drifts 70 points at roughly a third of the depth, which is
+what makes the two planes separate.
 
 Reduce Motion does not switch it off; it takes the travel down to a quarter,
 which keeps the depth while putting the movement well inside what Reduce Motion
@@ -360,10 +457,21 @@ snapping, keyboard control, VoiceOver, air gestures and clap-to-open all work
 inside a folder without being written twice. The wall keeps its own selection,
 so closing puts you back on the folder you came from. Escape closes it.
 
-Manage folders in Settings: create and name one, give it an icon, move apps and
-websites in and out through each row's **Move To…** menu, and reorder within
-each scope independently. **Deleting a folder never deletes what is in it** —
-its contents move back to the main launcher and then the folder goes.
+**A folder groups tiles; it does not take them off the wall.** Something in a
+folder appears in both places, the way a song in a playlist is still in your
+library. A folder is a second route to the same tile, never a place tiles
+disappear to — so putting Mail in Work leaves Mail exactly where it was.
+
+That is why each tile carries two positions: `sortOrder` for the wall and
+`folderSortOrder` for inside its folder. The same tile can be third on the wall
+and first in a folder, and reordering one scope cannot disturb the other.
+
+Manage folders in Settings: create and name one, give it an icon, and use each
+row's **Add To…** menu — *add*, not move. Opening a folder's own settings offers
+everything not already in it. Removing something from a folder only removes the
+grouping. **Deleting a folder never deletes what is in it**, and never even
+moves it: its members were on the wall the whole time, so only the grouping
+goes.
 
 ---
 

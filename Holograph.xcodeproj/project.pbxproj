@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0888778AE4AC523479E82C0E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A06365E98CE4387A5697824 /* Assets.xcassets */; };
+		0D067731502B658563F7AB68 /* SystemVoiceSpeech.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CA0573617F702AFA551BF4 /* SystemVoiceSpeech.swift */; };
 		0EBCF848064C6917F8E44750 /* DemoContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9795AB2394722BC0A465035C /* DemoContentTests.swift */; };
 		0F2C5B1B7CEB89591D8F6721 /* CarouselGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB1A9D7DE03DA7025A6A4E2 /* CarouselGeometryTests.swift */; };
 		0FFCF3D438E872A9C282A35C /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9DA080B4D789F02B83DEF8 /* AppServices.swift */; };
@@ -135,6 +136,7 @@
 		3F3F3EDC9C80643EF4F8F63E /* HolographicCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolographicCarousel.swift; sourceTree = "<group>"; };
 		411052B06675BA66A48CA899 /* HoloBrowserPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoloBrowserPolicy.swift; sourceTree = "<group>"; };
 		45D56F181635003D022467CA /* NeuralSpeech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralSpeech.swift; sourceTree = "<group>"; };
+		49CA0573617F702AFA551BF4 /* SystemVoiceSpeech.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemVoiceSpeech.swift; sourceTree = "<group>"; };
 		4AA6459267EC203C3EBE7B7D /* HapticFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticFeedback.swift; sourceTree = "<group>"; };
 		4B33EDCF51CC4D2D8BB7D091 /* FolderMembershipPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderMembershipPicker.swift; sourceTree = "<group>"; };
 		4D451EBD8599B31D7C70FD0B /* LaunchURLValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchURLValidatorTests.swift; sourceTree = "<group>"; };
@@ -398,6 +400,7 @@
 				45D56F181635003D022467CA /* NeuralSpeech.swift */,
 				A484FD65121E780E48A76D30 /* SelectionStore.swift */,
 				2D7DB90E37CC6CBED67D8F8C /* SoundFeedback.swift */,
+				49CA0573617F702AFA551BF4 /* SystemVoiceSpeech.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -633,6 +636,7 @@
 				2827C7F7E10B81F015F904BD /* StoredLauncherApp.swift in Sources */,
 				7F7EAF8B848406BEDC90A81B /* StubAppLauncher.swift in Sources */,
 				DCB8F952E7AC0137E5F5E43B /* SwiftDataLauncherRepository.swift in Sources */,
+				0D067731502B658563F7AB68 /* SystemVoiceSpeech.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
