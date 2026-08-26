@@ -58,16 +58,6 @@ enum AccessibilityID {
     static func removeFromFolder(_ name: String) -> String { "settings.removeFromFolder.\(name)" }
     static func folderCandidate(_ name: String) -> String { "settings.folderCandidate.\(name)" }
     static let headTracking = "settings.headTracking"
-    static let calibration = "settings.calibration"
-    static let calibrationSheet = "calibration.sheet"
-    static let calibrationRun = "calibration.run"
-    static let calibrationStart = "calibration.start"
-    static let calibrationDone = "calibration.done"
-    static let calibrationReset = "calibration.reset"
-    static let calibrationDetail = "calibration.detail"
-    static let calibrationResult = "calibration.result"
-
-    static func calibrationExercise(_ name: String) -> String { "calibration.exercise.\(name)" }
     static let editorKind = "editor.kind"
     static let editorWebsiteURL = "editor.websiteURL"
     static let editorFolder = "editor.folder"

@@ -16,7 +16,6 @@ final class AppServices {
     let airGestures: AirGestureObserving
     let headTracking: HeadTracking
     let claps: ClapListening
-    let calibration: CalibrationSensing
     let selectionStore: SelectionStoring
     let iconProcessor: IconProcessor
     let metadataProvider: AppStoreMetadataProviding
@@ -29,7 +28,6 @@ final class AppServices {
         airGestures: AirGestureObserving,
         headTracking: HeadTracking,
         claps: ClapListening,
-        calibration: CalibrationSensing,
         selectionStore: SelectionStoring,
         iconProcessor: IconProcessor = IconProcessor(),
         metadataProvider: AppStoreMetadataProviding = AppStoreLookupService()
@@ -41,7 +39,6 @@ final class AppServices {
         self.airGestures = airGestures
         self.headTracking = headTracking
         self.claps = claps
-        self.calibration = calibration
         self.selectionStore = selectionStore
         self.iconProcessor = iconProcessor
         self.metadataProvider = metadataProvider
@@ -104,18 +101,15 @@ struct AppComposition {
         let airGestures: AirGestureObserving
         let headTracking: HeadTracking
         let claps: ClapListening
-        let calibration: CalibrationSensing
         #if os(iOS)
         // Both camera features attach to the same session; see HoloCameraSource.
         airGestures = staysQuiet ? InertAirGestureSource() : CameraAirGestureSource()
         headTracking = staysQuiet ? InertHeadTrackingSource() : CameraHeadTrackingSource()
         claps = staysQuiet ? InertClapListener() : MicrophoneClapSource()
-        calibration = staysQuiet ? InertCalibrationSensor() : LiveCalibrationSensor()
         #else
         airGestures = InertAirGestureSource()
         headTracking = InertHeadTrackingSource()
         claps = InertClapListener()
-        calibration = InertCalibrationSensor()
         #endif
 
         // The launch voice, in two layers. The neural model speaks when a
@@ -146,7 +140,6 @@ struct AppComposition {
             airGestures: airGestures,
             headTracking: headTracking,
             claps: claps,
-            calibration: calibration,
             selectionStore: selectionStore
         )
 

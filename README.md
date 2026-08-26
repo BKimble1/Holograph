@@ -227,58 +227,6 @@ only thing that leaves the detector is a gesture.
 
 ---
 
-## Calibration
-
-Every threshold above is an average of people. **Settings → Calibrate to You**
-replaces the ones that vary most with measurements of you: three short
-exercises, a minute in total, and nothing kept but a handful of numbers.
-
-The design rule throughout is that a calibration must never be able to make the
-launcher *worse*. Each exercise measures, takes a robust statistic rather than a
-best or worst case, applies a safety margin in the forgiving direction, and
-clamps the result to a range the detector is known to work in. A run that goes
-badly — a hand out of frame, a quiet room, three claps that were really one —
-lands on the clamp, which is roughly where the default already was.
-
-| Exercise | What you do | What it measures | What it sets |
-| --- | --- | --- | --- |
-| **Hand** | Three flicks left and right, at your distance | Peak speed and travel of each flick | `flickStartSpeed`, `flickTravelSpans` |
-| **Face** | Look around the screen — corner to corner | How far your head actually moves in frame | `headRange` |
-| **Clap** | Three double claps, at your volume | Level of the quietest clap, widest gap between the pair | `clapLevel`, `clapMaximumGap` |
-
-**Why medians, and why those margins.** A calibration set from your *fastest*
-flick would refuse every ordinary one; set from your slowest it would fire on a
-wave. The hand exercise therefore takes the **median** peak speed of the flicks
-it saw and keeps **45%** of it, and the median travel and keeps **55%** — so an
-average flick clears the bar with room to spare, and an unusually lazy one still
-does. The clap exercise works from the **quietest** clap rather than the median,
-because a threshold above your quietest clap is a threshold that misses claps,
-and takes another **6 dB** off it; the gap between the two claps takes the
-**widest** you produced and adds **35%**. Head range weights horizontal movement
-over vertical (0.7 / 0.3, because that is the axis the effect is mostly built
-from), halves it to a per-side figure, and keeps 80%.
-
-Three flicks and three double claps is deliberate: enough for a median to mean
-something, few enough that people actually finish. The flow simply keeps
-listening until it has three good ones and shows each as it lands, so you can
-see it working rather than guessing. The face exercise is different in kind — it
-wants coverage, not repetitions — so it collects 45 readings while you look
-around and takes the extent of where your head went.
-
-The maths is pure and lives in `Calibration.swift` — `HandCalibrator`,
-`HeadCalibrator`, `ClapCalibrator` — with no camera, microphone or UI anywhere
-near it, which is why it is all directly unit tested, clamps included.
-`CalibrationProfile` is a small `Codable` struct of optionals; anything not
-measured keeps its default, and **Reset** removes the file. `applying(_:)` on
-each detector's `Thresholds` is where a profile turns into behaviour, and it is
-the only place that can, so there is exactly one thing to test.
-
-Sensing during calibration goes through the same `HoloCameraSource` as
-everything else, as a third consumer alongside gestures and head tracking, with
-raw readings switched on for the duration. Nothing is recorded.
-
----
-
 ## Sound
 
 Two accents, both on by default and both switchable in Settings:

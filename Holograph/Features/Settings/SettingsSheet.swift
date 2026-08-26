@@ -20,7 +20,6 @@ struct SettingsSheet: View {
     @State private var pendingDelete: LauncherItem?
     /// Which folder's "add things to me" picker is open.
     @State private var addingToFolder: LauncherItem?
-    @State private var isCalibrating = false
     @State private var isConfirmingRemoveAll = false
     @State private var testLaunchResult: TestLaunchResult?
 
@@ -35,7 +34,6 @@ struct SettingsSheet: View {
                 airGestureSection
                 headTrackingSection
                 clapSection
-                calibrationSection
                 soundSection
                 maintenanceSection
                 aboutSection
@@ -63,11 +61,6 @@ struct SettingsSheet: View {
         .presentationDetents([.large])
         .accessibilityIdentifier(AccessibilityID.settingsSheet)
         .onAppear(perform: applyInitialRoute)
-        .sheet(isPresented: $isCalibrating) {
-            CalibrationSheet()
-                .environment(services)
-                .environment(model)
-        }
         .sheet(item: $addingToFolder) { folder in
             FolderMembershipPicker(
                 folder: folder,
@@ -427,24 +420,6 @@ struct SettingsSheet: View {
             return
         }
         #endif
-    }
-
-    /// One place to tune all three of the things that watch or listen. Its own
-    /// section rather than a row inside each feature: calibrating is worth
-    /// doing once, for everything, rather than three times in three places.
-    private var calibrationSection: some View {
-        Section {
-            Button {
-                isCalibrating = true
-            } label: {
-                Label("Calibrate to You", systemImage: "slider.horizontal.3")
-            }
-            .accessibilityIdentifier(AccessibilityID.calibration)
-        } header: {
-            Text("Calibration")
-        } footer: {
-            Text("Three short exercises — a few flicks, a look around the screen, a few claps — and Holograph adjusts its thresholds to how you actually move and sound rather than to an average. Nothing is recorded; each exercise measures a handful of numbers and keeps only those.")
-        }
     }
 
     /// Read straight from defaults by the sound service at the point of use, so

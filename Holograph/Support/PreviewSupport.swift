@@ -40,7 +40,6 @@ final class PreviewHarness {
             airGestures: InertAirGestureSource(),
             headTracking: InertHeadTrackingSource(),
             claps: InertClapListener(),
-            calibration: InertCalibrationSensor(),
             selectionStore: selectionStore,
             metadataProvider: PreviewMetadataProvider()
         )
