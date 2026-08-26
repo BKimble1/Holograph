@@ -126,14 +126,33 @@ class LauncherUITestCase: XCTestCase {
 
     /// Settings is a form sheet; the lower sections need scrolling into view
     /// before they can be tapped.
+    ///
+    /// A row that has scrolled just past the edge of a SwiftUI list stays in
+    /// the accessibility tree with a frame that is clipped away to nothing.
+    /// Asking such an element whether it is hittable does not answer `false` —
+    /// it fails the test outright with "activation point invalid and no
+    /// suggested hit points based on element frame". So the frame is checked
+    /// first, and `isHittable` is only asked about something that is genuinely
+    /// on screen.
     @discardableResult
-    func revealInSettings(_ identifier: String, attempts: Int = 9) -> XCUIElement {
+    func revealInSettings(_ identifier: String, attempts: Int = 12) -> XCUIElement {
         let element = app.descendants(matching: .any)[identifier].firstMatch
         for _ in 0..<attempts {
-            if element.exists, element.isHittable { return element }
+            if isOnScreen(element), element.isHittable { return element }
             app.swipeUp(velocity: .slow)
         }
         return element
+    }
+
+    /// Whether the element exists with a frame big enough to aim at, inside the
+    /// window. Safe to ask about anything, including a row clipped to nothing.
+    func isOnScreen(_ element: XCUIElement) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        guard frame.width > 1, frame.height > 1 else { return false }
+        let window = app.windows.firstMatch
+        guard window.exists else { return false }
+        return window.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
     }
 
     func openSettings(file: StaticString = #filePath, line: UInt = #line) {
