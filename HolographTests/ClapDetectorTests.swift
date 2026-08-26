@@ -102,7 +102,7 @@ final class ClapDetectorTests: XCTestCase {
     }
 
     /// Runs a scenario over every seed and returns how many times it fired.
-    private func counts(_ scenario: (inout Room) -> Void, bed: Double = -55) -> [Int] {
+    private func counts(bed: Double = -55, _ scenario: (inout Room) -> Void) -> [Int] {
         Self.seeds.map { seed in
             var room = Room(seed: seed, bed: bed)
             scenario(&room)
