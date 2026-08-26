@@ -239,7 +239,8 @@ enum HoloClick {
 /// container spelled out, shared by the carousel tick and the spoken
 /// announcements rather than written twice.
 enum PCMWaveWriter {
-    static let headerByteCount = PCMWaveWriter.headerByteCount
+    /// RIFF + fmt + data headers, before a single sample.
+    static let headerByteCount = 44
 
     static func wavData(samples: [Float], sampleRate: Double) -> Data {
         let channels = 1
