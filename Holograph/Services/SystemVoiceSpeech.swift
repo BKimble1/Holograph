@@ -148,28 +148,69 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
         }
 
         return await withCheckedContinuation { continuation in
-            var collected: [Float] = []
-            var rate: Double = 0
-            var finished = false
+            let collector = BufferCollector { continuation.resume(returning: $0) }
 
-            // `write` calls back on an arbitrary queue and calls back a final
-            // time with an empty buffer to mark the end. Resuming twice traps,
-            // hence the flag.
+            // `write` calls back on an arbitrary queue, and calls back a final
+            // time with an empty buffer to mark the end. Resuming a
+            // continuation twice traps, so which call finishes is decided
+            // inside the collector's lock rather than by a captured flag.
             synthesizer.write(utterance) { buffer in
                 guard let pcm = buffer as? AVAudioPCMBuffer else { return }
-                if pcm.frameLength == 0 {
-                    guard !finished else { return }
-                    finished = true
-                    continuation.resume(
-                        returning: collected.isEmpty
-                            ? nil
-                            : SpokenPhrase(samples: collected, sampleRate: rate)
-                    )
-                    return
-                }
-                rate = pcm.format.sampleRate
-                collected.append(contentsOf: Self.mono(from: pcm))
+                guard pcm.frameLength > 0 else { return collector.finish() }
+                collector.append(Self.mono(from: pcm), sampleRate: pcm.format.sampleRate)
             }
+
+            // And a net under it. A continuation that is never resumed hangs
+            // its task forever, which for the pre-render loop would mean no
+            // tile after this one ever gets a phrase. The timeout is far longer
+            // than any announcement takes to render, so reaching it means
+            // something went wrong rather than something was slow.
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.renderTimeout) {
+                collector.finish()
+            }
+        }
+    }
+
+    /// How long a phrase gets to render before the attempt is abandoned.
+    static let renderTimeout: TimeInterval = 10
+
+    /// Gathers samples handed over from whichever queue the synthesiser used,
+    /// and resumes exactly once.
+    ///
+    /// `@unchecked Sendable` because every access is inside the lock, which is
+    /// the whole of what it does.
+    private final class BufferCollector: @unchecked Sendable {
+        private let lock = NSLock()
+        private var samples: [Float] = []
+        private var sampleRate: Double = 0
+        private var deliver: ((SpokenPhrase?) -> Void)?
+
+        init(deliver: @escaping (SpokenPhrase?) -> Void) {
+            self.deliver = deliver
+        }
+
+        func append(_ new: [Float], sampleRate rate: Double) {
+            lock.lock()
+            defer { lock.unlock() }
+            guard deliver != nil else { return }
+            sampleRate = rate
+            samples.append(contentsOf: new)
+        }
+
+        /// Delivers what was gathered, once. Every call after the first does
+        /// nothing at all, which is what makes the watchdog safe to fire even
+        /// when the synthesiser already finished.
+        func finish() {
+            lock.lock()
+            let callback = deliver
+            deliver = nil
+            let phrase = samples.isEmpty || sampleRate <= 0
+                ? nil
+                : SpokenPhrase(samples: samples, sampleRate: sampleRate)
+            lock.unlock()
+            // Outside the lock: the caller resumes a continuation here, and
+            // holding a lock across that is how deadlocks are made.
+            callback?(phrase)
         }
     }
 
@@ -178,7 +219,10 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
     /// The buffer is normally 16-bit mono, but the format is the system's
     /// choice rather than ours, so every case it can legally be is handled:
     /// float channels are averaged, integer channels are scaled.
-    static func mono(from buffer: AVAudioPCMBuffer) -> [Float] {
+    ///
+    /// `nonisolated` because it is called from the synthesiser's own queue.
+    /// It touches nothing but its argument.
+    nonisolated static func mono(from buffer: AVAudioPCMBuffer) -> [Float] {
         let frames = Int(buffer.frameLength)
         guard frames > 0 else { return [] }
         let channels = Int(buffer.format.channelCount)
@@ -211,15 +255,14 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
 
     private static func installedVoices() -> [SystemVoiceDescriptor] {
         AVSpeechSynthesisVoice.speechVoices().map { voice in
+            // `gender` is `.unspecified` for a good number of the older
+            // bundles, so the name check is the fallback rather than the
+            // primary.
             let male: Bool
-            if #available(iOS 17.0, macOS 14.0, *) {
-                switch voice.gender {
-                case .male: male = true
-                case .female: male = false
-                default: male = SystemVoiceCatalogue.isProbablyMale(name: voice.name)
-                }
-            } else {
-                male = SystemVoiceCatalogue.isProbablyMale(name: voice.name)
+            switch voice.gender {
+            case .male: male = true
+            case .female: male = false
+            default: male = SystemVoiceCatalogue.isProbablyMale(name: voice.name)
             }
             return SystemVoiceDescriptor(
                 identifier: voice.identifier,
