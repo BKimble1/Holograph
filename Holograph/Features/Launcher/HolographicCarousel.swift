@@ -45,6 +45,13 @@ struct HolographicCarousel: View {
                 .scrollTargetBehavior(.viewAligned)
                 .scrollPosition(id: $selectedID, anchor: .center)
                 .scrollIndicators(.hidden)
+                // A scroll view clips to its bounds, and the selected tile's
+                // halo is a shadow half a tile wide — far more than the stage
+                // leaves around it. So the glow was being sliced off on a
+                // straight line above and below the wall, which is the one
+                // thing a glow must never do. The tiles are already faded by
+                // distance, so nothing else needs the clip.
+                .scrollClipDisabled()
                 .contentMargins(.horizontal, sideInset, for: .scrollContent)
                 // `scrollPosition` alone does not always land on the selected
                 // tile the first time the row is laid out — the lazy stack has

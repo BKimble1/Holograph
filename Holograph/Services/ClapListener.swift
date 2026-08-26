@@ -88,7 +88,7 @@ struct ClapDetector {
         var onsetRise: Double = 12
         /// And how loud in absolute terms, so a rustle in a silent room is not
         /// promoted to a clap for want of competition. Full scale is 0 dB.
-        var absoluteLevel: Double = -32
+        var absoluteLevel: Double = -28
         /// How much it must gain in `attackWindow`. A clap is at full volume
         /// within a few milliseconds; a raised voice takes fifty. This is the
         /// test that keeps a conversation quiet.
@@ -97,26 +97,45 @@ struct ClapDetector {
         /// A clap that has not fallen back to within this of the room, within
         /// `maximumClapDuration`, was something sustained.
         var settleRise: Double = 6
+        /// Or fallen this far from its own loudest moment, which is the quicker
+        /// test of the two and the one that matters in a live room: waiting for
+        /// a clap to reach the noise floor takes a tenth of a second, which is
+        /// longer than the gap between two quick claps. That wait was why a
+        /// quick pair registered as one.
+        var collapseDrop: Double = 12
         var maximumClapDuration: TimeInterval = 0.25
-        /// Quiet after one clap before the next can be heard, so a room's echo
-        /// is not the second clap.
-        var refractory: TimeInterval = 0.09
-        /// How far apart the two claps may be.
-        var minimumGap: TimeInterval = 0.12
+        /// Quiet after one clap before the next can be heard.
+        var refractory: TimeInterval = 0.05
+        /// How far apart the two claps may be. The lower bound is what people
+        /// actually do when they clap twice in earnest.
+        var minimumGap: TimeInterval = 0.10
         var maximumGap: TimeInterval = 0.70
-        /// Silence required after the second clap before it counts. This is what
-        /// rules out music: a beat is always followed by another beat, so every
-        /// pair in a rhythm is cancelled by the one that comes next. It costs
-        /// this much delay before an app opens, which is the price of not
-        /// opening apps to a drum track.
+        /// How much louder one clap may be than the other. Two claps come from
+        /// one pair of hands and match; a clap and a door do not, and neither
+        /// does a strike and a ripple in its own tail.
+        var matchedLevel: Double = 9
+
+        /// Silence required after the second clap before it counts, as a
+        /// multiple of the pair's own gap.
         ///
-        /// It has to outlast the gap between beats to catch the next one, and at
-        /// this length an app still opens within about eight tenths of a second
-        /// of the first clap.
-        var holdOff: TimeInterval = 0.45
-        /// And silence required before it — including since the last double clap
-        /// was reported, so a rhythm cannot fire once per bar.
-        var leadIn: TimeInterval = 1.0
+        /// This is what rules out music, and being proportional is the point: a
+        /// rhythm repeats at roughly the spacing of any two beats in it, so
+        /// waiting out one of those spacings catches the beat that follows. A
+        /// fixed wait has a blind spot at every period just longer than itself
+        /// — which is exactly where apps were opening themselves. It also means
+        /// a quick double clap is answered quickly, because there is less to
+        /// wait for.
+        var holdOffFactor: Double = 2.0
+        var minimumHoldOff: TimeInterval = 0.18
+        var maximumHoldOff: TimeInterval = 0.85
+        /// Silence required *before* the pair. A rhythm loses the odd beat to
+        /// its own echo, and the survivors then look like a pair on their own —
+        /// so the run-up has to be clear for longer than a bar.
+        var leadIn: TimeInterval = 2.5
+        /// And how soon after opening one app another may be opened. Shorter
+        /// than the lead-in: a person coming back to clap again is not a
+        /// rhythm.
+        var rearm: TimeInterval = 1.0
 
         /// How fast the background estimate may climb, in decibels per second.
         /// Slow, so a clap barely raises the bar it is being judged against.
@@ -131,16 +150,21 @@ struct ClapDetector {
         static let `default` = Thresholds()
     }
 
+    /// A clap that has been heard but has not yet proved it collapses.
+    private struct Strike {
+        var began: TimeInterval
+        var peak: Double
+    }
+
     let thresholds: Thresholds
 
     private var background: Double?
     private var time: TimeInterval?
     /// Recent levels, only as far back as the attack window needs.
     private var recent: [(time: TimeInterval, level: Double)] = []
-    /// An onset that has not yet proved it collapses.
-    private var pendingOnset: TimeInterval?
+    private var pending: Strike?
     /// Confirmed claps, most recent last.
-    private var claps: [TimeInterval] = []
+    private var claps: [Strike] = []
     /// When a pair will be reported, if nothing else is heard first.
     private var reportAt: TimeInterval?
     private var nextOnsetAllowed: TimeInterval = -.greatestFiniteMagnitude
@@ -163,7 +187,7 @@ struct ClapDetector {
             background = decibels
             time = readingTime
             recent = [(readingTime, decibels)]
-            pendingOnset = nil
+            pending = nil
             return false
         }
 
@@ -176,6 +200,7 @@ struct ClapDetector {
             recent.removeFirst()
         }
         let wasAt = recent[0].level
+        let justWas = recent.count >= 2 ? recent[recent.count - 2].level : decibels
 
         // Asymmetric: creeps up, settles down. Climbing slowly is what stops a
         // clap from raising the bar it is being measured against; falling on a
@@ -185,28 +210,46 @@ struct ClapDetector {
             : room + (decibels - room) * min(1, elapsed / thresholds.backgroundFall)
 
         guard readingTime >= mutedUntil else {
-            pendingOnset = nil
+            pending = nil
             return false
         }
 
-        if let onset = pendingOnset {
-            if decibels <= room + thresholds.settleRise {
-                pendingOnset = nil
-                confirmClap(startedAt: onset, endedAt: readingTime)
-            } else if readingTime - onset > thresholds.maximumClapDuration {
+        let isLoudEnough = decibels >= room + thresholds.onsetRise
+            && decibels >= thresholds.absoluteLevel
+
+        if var strike = pending {
+            strike.peak = max(strike.peak, decibels)
+            pending = strike
+
+            // A second clap landing on the first one's tail. Measured against
+            // the reading right before it, not against the attack window, which
+            // is still looking at the silence in front of the first clap and
+            // would read its whole decay as a run of strikes. And it has to be
+            // a strike rather than a ripple in that decay, which means as loud
+            // as the one already in hand.
+            let isRestrike = decibels - justWas >= thresholds.attackRise
+                && decibels >= strike.peak - thresholds.matchedLevel
+                && readingTime - strike.began >= thresholds.refractory
+
+            if isLoudEnough, isRestrike {
+                pending = Strike(began: readingTime, peak: decibels)
+                reportAt = nil
+                confirm(strike, endedAt: readingTime)
+            } else if decibels <= room + thresholds.settleRise
+                        || decibels <= strike.peak - thresholds.collapseDrop {
+                pending = nil
+                confirm(strike, endedAt: readingTime)
+            } else if readingTime - strike.began > thresholds.maximumClapDuration {
                 // Still loud: sustained, so never a clap.
-                pendingOnset = nil
+                pending = nil
             }
-        } else if readingTime >= nextOnsetAllowed,
-                  decibels >= room + thresholds.onsetRise,
-                  decibels >= thresholds.absoluteLevel,
+        } else if readingTime >= nextOnsetAllowed, isLoudEnough,
                   decibels - wasAt >= thresholds.attackRise {
-            pendingOnset = readingTime
+            pending = Strike(began: readingTime, peak: decibels)
             // A pair waiting out its hold-off is waiting for silence, and this
             // is not silence. Cancelling here rather than on the confirmation a
             // tenth of a second later is what catches the next beat of a rhythm
-            // in time — waiting for it to finish let a beat that started inside
-            // the hold-off arrive too late to stop the launch.
+            // in time.
             reportAt = nil
         }
 
@@ -222,7 +265,7 @@ struct ClapDetector {
     /// while, and forget anything half-heard.
     mutating func mute(for duration: TimeInterval, from now: TimeInterval) {
         mutedUntil = max(mutedUntil, now + duration)
-        pendingOnset = nil
+        pending = nil
         claps.removeAll()
         reportAt = nil
     }
@@ -231,7 +274,7 @@ struct ClapDetector {
         background = nil
         time = nil
         recent.removeAll()
-        pendingOnset = nil
+        pending = nil
         claps.removeAll()
         reportAt = nil
         nextOnsetAllowed = -.greatestFiniteMagnitude
@@ -242,26 +285,27 @@ struct ClapDetector {
     /// Exposed for tests: whether a pair is waiting out its hold-off.
     var isAwaitingSilence: Bool { reportAt != nil }
 
-    private mutating func confirmClap(startedAt onset: TimeInterval, endedAt: TimeInterval) {
+    private mutating func confirm(_ strike: Strike, endedAt: TimeInterval) {
         nextOnsetAllowed = endedAt + thresholds.refractory
-        // Anything new means whatever was waiting was part of a run of sounds,
-        // not a pair on its own.
-        reportAt = nil
 
-        claps.append(onset)
+        claps.append(strike)
         if claps.count > 3 { claps.removeFirst(claps.count - 3) }
         guard claps.count >= 2 else { return }
 
-        let gap = claps[claps.count - 1] - claps[claps.count - 2]
+        let second = claps[claps.count - 1]
+        let first = claps[claps.count - 2]
+        let gap = second.began - first.began
         guard gap >= thresholds.minimumGap, gap <= thresholds.maximumGap else { return }
+        // Two claps from one pair of hands are about as loud as each other.
+        guard abs(second.peak - first.peak) <= thresholds.matchedLevel else { return }
 
-        let opening = claps[claps.count - 2]
-        // Quiet before it: nothing heard in the run-up, and not hard on the
-        // heels of the last pair reported.
-        if claps.count >= 3, opening - claps[claps.count - 3] <= thresholds.leadIn { return }
-        guard opening - lastReport > thresholds.leadIn else { return }
+        // Quiet before it, and not hard on the heels of the last app opened.
+        if claps.count >= 3, first.began - claps[claps.count - 3].began <= thresholds.leadIn { return }
+        guard first.began - lastReport > thresholds.rearm else { return }
 
-        reportAt = claps[claps.count - 1] + thresholds.holdOff
+        let hold = min(thresholds.maximumHoldOff,
+                       max(thresholds.minimumHoldOff, gap * thresholds.holdOffFactor))
+        reportAt = second.began + hold
     }
 }
 

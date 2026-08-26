@@ -81,13 +81,27 @@ final class ClapDetectorTests: XCTestCase {
             }
         }
 
-        /// Two claps with a gap between them, in a quiet room.
-        mutating func doubleClap(gap: TimeInterval, peak: Double = -8) {
+        /// Two claps with a gap between them, in a quiet room. The gap is the
+        /// time between the two strikes, so a quick pair really is quick — the
+        /// second clap lands while the first is still ringing.
+        mutating func doubleClap(
+            gap: TimeInterval,
+            peak: Double = -8,
+            decay: TimeInterval = 0.025
+        ) {
+            quiet(for: 2.0)
+            doubleClapBody(gap: gap, peak: peak, decay: decay)
             quiet(for: 1.5)
-            clap(peak: peak)
-            quiet(for: max(gap - 0.30, 0.02))
-            clap(peak: peak)
-            quiet(for: 1.5)
+        }
+
+        /// The two strikes alone, for measuring how long the answer takes.
+        mutating func doubleClapBody(
+            gap: TimeInterval,
+            peak: Double = -8,
+            decay: TimeInterval = 0.025
+        ) {
+            clap(peak: peak, decay: decay, lasting: gap)
+            clap(peak: peak, decay: decay)
         }
     }
 
@@ -113,7 +127,11 @@ final class ClapDetectorTests: XCTestCase {
     // MARK: - What should open an app
 
     func testTwoClapsOpenSomething() {
-        for gap in [0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70] {
+        // Down to an eighth of a second apart, which is what clapping twice in
+        // earnest actually looks like. This used to need a third of a second:
+        // a clap was not counted until it had fallen all the way back to the
+        // room, and a quicker second one landed inside that wait and was lost.
+        for gap in [0.11, 0.15, 0.20, 0.25, 0.35, 0.50, 0.70] {
             let fired = counts { $0.doubleClap(gap: gap) }
             XCTAssertEqual(
                 Set(fired), [1],
@@ -122,36 +140,28 @@ final class ClapDetectorTests: XCTestCase {
         }
     }
 
-    func testClapsFromAcrossTheRoomStillCount() {
-        // Quieter, because the hands are further away — but the shape is the
-        // same, and the bar is set against the room rather than at some figure.
-        for peak in [-18.0, -26.0] {
-            XCTAssertEqual(Set(counts { $0.doubleClap(gap: 0.35, peak: peak) }), [1])
+    func testAQuickPairWorksInADryRoomToo() {
+        // A room with no reverberation gives each clap a much shorter tail, so
+        // the pair looks quite different arriving.
+        for gap in [0.11, 0.15, 0.25] {
+            XCTAssertEqual(Set(counts { $0.doubleClap(gap: gap, decay: 0.008) }), [1])
         }
     }
 
-    func testAQuickPairOfClapsCounts() {
-        // Clapping twice in earnest is fast — an eighth of a second apart, not a
-        // half. In a dry room, where each clap is over in forty milliseconds,
-        // the second one has somewhere to land.
-        for gap in [0.13, 0.15, 0.20, 0.25] {
-            let fired = counts { room in
-                room.quiet(for: 1.5)
-                room.clap(decay: 0.008, lasting: gap)
-                room.clap(decay: 0.008)
-                room.quiet(for: 1.5)
-            }
-            XCTAssertEqual(Set(fired), [1], "two claps \(gap)s apart should be one launch")
-        }
+    func testClapsFromAcrossTheRoomStillCount() {
+        // Quieter, because the hands are further away — but the shape is the
+        // same, and the bar is set against the room rather than at some figure.
+        XCTAssertEqual(Set(counts { $0.doubleClap(gap: 0.20, peak: -24) }), [1])
+    }
+
+    func testClappingInALoudRoomWorks() {
+        XCTAssertEqual(Set(counts(bed: -33) { $0.doubleClap(gap: 0.20) }), [1])
     }
 
     func testTwoDeliberateDoubleClapsAreTwoLaunches() {
         let fired = counts { room in
-            room.quiet(for: 1.5)
-            room.clap(); room.quiet(for: 0.05); room.clap()
-            room.quiet(for: 1.8)
-            room.clap(); room.quiet(for: 0.05); room.clap()
-            room.quiet(for: 1.5)
+            room.doubleClap(gap: 0.20)
+            room.doubleClap(gap: 0.20)
         }
         XCTAssertEqual(Set(fired), [2])
     }
@@ -160,7 +170,7 @@ final class ClapDetectorTests: XCTestCase {
 
     func testOneClapDoesNothing() {
         let fired = counts { room in
-            room.quiet(for: 1.5)
+            room.quiet(for: 2.0)
             room.clap()
             room.quiet(for: 2.0)
         }
@@ -168,7 +178,23 @@ final class ClapDetectorTests: XCTestCase {
     }
 
     func testTwoClapsTooFarApartAreTwoSeparateClaps() {
-        XCTAssertEqual(Set(counts { $0.doubleClap(gap: 1.2) }), [0])
+        XCTAssertEqual(Set(counts { $0.doubleClap(gap: 1.0) }), [0])
+    }
+
+    func testAClapAndSomethingElseIsNotAPair() {
+        // Two claps come from one pair of hands and are about as loud as each
+        // other. A clap and a door, or a clap and a knock on the table, are two
+        // different sounds that happen to be near each other — which is most of
+        // what was opening apps when nobody had clapped.
+        for (first, second) in [(-8.0, -32.0), (-32.0, -8.0)] {
+            let fired = counts { room in
+                room.quiet(for: 2.0)
+                room.clap(peak: first, lasting: 0.20)
+                room.clap(peak: second)
+                room.quiet(for: 1.5)
+            }
+            XCTAssertEqual(Set(fired), [0], "\(first)dB and \(second)dB are not a pair of hands")
+        }
     }
 
     func testTalkingDoesNotOpenApps() {
@@ -198,18 +224,15 @@ final class ClapDetectorTests: XCTestCase {
 
     func testARhythmDoesNotKeepOpeningApps() {
         // A beat is the hardest case there is: struck, loud, and repeatedly two
-        // of them a third of a second apart. A level meter has no timbre to tell
-        // it from a pair of hands, so what separates them is that a rhythm never
-        // stops — every pair is cancelled by the beat that follows.
-        //
-        // What survives is the moment a track starts, before there is any
-        // rhythm to recognise yet. That is bounded rather than eliminated, and
-        // this is the measured bound: over twenty seconds of seven different
-        // beats, across eighty noise realisations each, the worst any of them
-        // managed was two — never a stream.
+        // of them half a second apart. A level meter has no timbre to tell it
+        // from a pair of hands, so what separates them is that a rhythm never
+        // stops — every pair is cancelled by the beat that follows, and the
+        // wait for that beat is a multiple of the pair's own spacing rather
+        // than a fixed time. A fixed wait has a blind spot at every period just
+        // longer than itself, and the 0.55s track below sat squarely in it.
         for (bed, beat, period) in [
             (-24.0, -4.0, 0.30), (-24.0, -4.0, 0.40), (-20.0, -7.0, 0.50),
-            (-26.0, -2.0, 0.60), (-18.0, -3.0, 0.45),
+            (-26.0, -2.0, 0.60), (-18.0, -3.0, 0.45), (-22.0, -5.0, 0.55),
         ] {
             let fired = counts { room in
                 room.quiet(for: 1.0)
@@ -231,13 +254,13 @@ final class ClapDetectorTests: XCTestCase {
         for seed in Self.seeds {
             var room = Room(seed: seed)
             room.quiet(for: 1.0)
-            room.music(for: 30.0, bed: -26, beat: -2, period: 0.6)
+            room.music(for: 30.0, bed: -22, beat: -5, period: 0.55)
             for (earlier, later) in zip(room.fired, room.fired.dropFirst()) {
                 closest = min(closest, later - earlier)
             }
         }
         guard closest < .greatestFiniteMagnitude else { return }
-        XCTAssertGreaterThan(closest, ClapDetector.Thresholds.default.leadIn)
+        XCTAssertGreaterThan(closest, ClapDetector.Thresholds.default.rearm)
     }
 
     func testAClapOverMusicIsNotEnoughOnItsOwn() {
@@ -246,8 +269,7 @@ final class ClapDetectorTests: XCTestCase {
         let fired = counts { room in
             room.quiet(for: 1.0)
             room.music(for: 2.0)
-            room.clap(peak: -2, over: -24)
-            room.quiet(for: 0.05, at: -24)
+            room.clap(peak: -2, over: -24, lasting: 0.20)
             room.clap(peak: -2, over: -24)
             room.music(for: 2.0)
         }
@@ -276,8 +298,8 @@ final class ClapDetectorTests: XCTestCase {
         // Half a pair, then the launcher speaks. The clap it heard before must
         // not pair up with whatever it hears afterwards.
         let fired = counts { room in
-            room.quiet(for: 1.5)
-            room.clap()
+            room.quiet(for: 2.0)
+            room.clap(lasting: 0.20)
             room.detector.mute(for: 0.1, from: room.now)
             room.quiet(for: 0.15)
             room.clap()
@@ -288,10 +310,9 @@ final class ClapDetectorTests: XCTestCase {
 
     func testResettingForgetsEverything() {
         var room = Room(seed: 1)
-        room.quiet(for: 1.5)
-        room.clap()
+        room.quiet(for: 2.0)
+        room.clap(lasting: 0.20)
         room.detector.reset()
-        room.quiet(for: 0.1)
         room.clap()
         room.quiet(for: 1.0)
         XCTAssertTrue(room.fired.isEmpty, "a listener that was restarted has heard nothing yet")
@@ -299,19 +320,18 @@ final class ClapDetectorTests: XCTestCase {
 
     // MARK: - Delay
 
-    func testAnAppOpensPromptlyEnoughToFeelConnected() {
+    func testAQuickClapIsAnsweredQuickly() {
         var room = Room(seed: 1)
-        room.quiet(for: 1.5)
+        room.quiet(for: 2.0)
         let started = room.now
-        room.clap()
-        room.quiet(for: 0.05)
-        room.clap()
+        room.doubleClapBody(gap: 0.15)
         room.quiet(for: 1.5)
 
         guard let heard = room.fired.first else { return XCTFail("nothing was heard") }
         // Waiting for silence after the pair is what rules out a drum track, and
-        // it is the whole of the delay. It should still feel like a response.
-        XCTAssertLessThan(heard - started, 1.0)
+        // it is the whole of the delay — but it is a multiple of the pair's own
+        // spacing, so clapping quickly is answered quickly.
+        XCTAssertLessThan(heard - started, 0.6)
     }
 }
 

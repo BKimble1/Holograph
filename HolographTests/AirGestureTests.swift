@@ -99,12 +99,11 @@ final class AirGestureDetectorTests: XCTestCase {
 
     // MARK: - Which way the wall goes
 
-    func testTheWallMovesAgainstTheHand() {
-        // Push the hand left and the apps come from the left, as though the wall
-        // were being shoved along — the opposite of dragging on glass, and what
-        // was asked for.
-        XCTAssertEqual(AirSwipe.left.selectionStep, -1)
-        XCTAssertEqual(AirSwipe.right.selectionStep, 1)
+    func testTheWallFollowsTheHand() {
+        // Sweep left and the apps travel left, so the next one arrives from the
+        // right — the same way a swipe on glass behaves.
+        XCTAssertEqual(AirSwipe.left.selectionStep, 1)
+        XCTAssertEqual(AirSwipe.right.selectionStep, -1)
     }
 
     func testAFlickAndADragAgreeOnDirection() {

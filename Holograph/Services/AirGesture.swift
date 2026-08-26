@@ -9,14 +9,14 @@ enum AirSwipe: Equatable, Sendable {
 
     /// How the selection moves when the hand goes this way.
     ///
-    /// Pushing a hand to the left moves the wall of apps to the *right*, so the
-    /// app that was on the left arrives in the middle — the opposite of dragging
-    /// on glass, and the way this was asked for. The mapping lives here so
-    /// flicks and drags can never drift apart.
+    /// The wall follows the hand: sweep left and the apps travel left, so the
+    /// next one arrives from the right — the same way a swipe on glass behaves.
+    /// The mapping lives here, in one place, so flicks and drags can never drift
+    /// apart, and reversing it is this one table.
     var selectionStep: Int {
         switch self {
-        case .left: return -1
-        case .right: return 1
+        case .left: return 1
+        case .right: return -1
         }
     }
 }
