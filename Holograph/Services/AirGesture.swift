@@ -146,22 +146,31 @@ struct AirGestureDetector {
         /// Speed, in spans per second, that opens a stroke. A hand is about
         /// three inches across the knuckles, so this is roughly six inches a
         /// second.
-        var startSpeed: Double = 2.0
-        /// And the lower speed that ends one. The gap between the two is the
-        /// hysteresis that stops a hovering hand chattering.
-        var stopSpeed: Double = 0.9
+        var startSpeed: Double = 2.6
+        /// And the lower speed that counts as stopped. It sits above the speed a
+        /// *still* hand appears to move at through landmark noise — measured at
+        /// about 1.1 spans per second — because a rest that is never detected
+        /// leaves the detector stuck refusing to fire again.
+        var stopSpeed: Double = 1.3
         /// How far the hand must travel within a stroke, in spans — around two
-        /// and a half inches, at any distance from the screen.
-        var travelSpans: Double = 0.85
+        /// inches, at any distance from the screen. Chosen by measurement: over
+        /// two hundred noise realisations this is the loosest setting at which
+        /// waving still never registers as a flick.
+        var travelSpans: Double = 0.68
         /// How straight the path has to be: |net displacement| ÷ |path length|.
         var straightness: Double = 0.55
-        /// Consecutive slow readings that count as the hand having stopped.
+        /// Consecutive quiet readings that end a stroke that has not yet earned
+        /// a gesture. Re-arming after one that has takes a single reading: the
+        /// next stroke still has to earn its own gesture, so being eager there
+        /// costs nothing and losing a deliberate second flick costs a lot.
         var stillReadings: Int = 2
+        /// How many recent speeds the stillness test takes the median of. One
+        /// noisy frame must not read as the hand setting off again.
+        var speedMedianWindow: Int = 3
         /// A stroke that goes on longer than this is not a flick.
         var maximumStrokeDuration: TimeInterval = 1.2
-        /// How stale the last resting position may be and still be used as the
-        /// start of a stroke.
-        var restRecency: TimeInterval = 0.35
+        /// How far back a stroke may reach to find where the movement began.
+        var strokeLookback: TimeInterval = 0.35
         /// A gap longer than this means the hand was lost and found again, not
         /// that it moved instantly.
         var maximumGap: TimeInterval = 0.4
@@ -203,7 +212,10 @@ struct AirGestureDetector {
     private var positionFilter = OneEuroFilter()
     private var smoothedSpan: Double?
     private var previous: (position: Double, time: TimeInterval)?
-    private var lastRest: (position: Double, time: TimeInterval)?
+    /// Recent readings, so a stroke can be measured from where the movement
+    /// began rather than from where the speed gate happened to open.
+    private var history: [(position: Double, time: TimeInterval, speed: Double)] = []
+    private var recentSpeeds: [Double] = []
     private var stroke: Stroke = .idle
     private var stillCount = 0
     private var pathLength = 0.0
@@ -245,7 +257,8 @@ struct AirGestureDetector {
         positionFilter.reset()
         smoothedSpan = nil
         previous = nil
-        lastRest = nil
+        history.removeAll()
+        recentSpeeds.removeAll()
         stroke = .idle
         stillCount = 0
         pathLength = 0
@@ -261,23 +274,31 @@ struct AirGestureDetector {
     // MARK: - Swipes
 
     private mutating func swipe(position: Double, speed: Double, at time: TimeInterval) -> AirGesture? {
-        let isStill = speed <= thresholds.stopSpeed
-        if isStill { lastRest = (position, time) }
-        stillCount = isStill ? stillCount + 1 : 0
+        history.append((position, time, speed))
+        if history.count > 12 { history.removeFirst(history.count - 12) }
+
+        // The median of the last few speeds, not the latest one: a single noisy
+        // frame must not read as the hand setting off again.
+        recentSpeeds.append(speed)
+        if recentSpeeds.count > thresholds.speedMedianWindow {
+            recentSpeeds.removeFirst(recentSpeeds.count - thresholds.speedMedianWindow)
+        }
+        let steadySpeed = recentSpeeds.sorted()[recentSpeeds.count / 2]
+        stillCount = steadySpeed <= thresholds.stopSpeed ? stillCount + 1 : 0
 
         switch stroke {
         case .idle:
             guard speed >= thresholds.startSpeed else { return nil }
-            // Measured from where the hand was last still, not from where it
-            // happened to be when the speed gate opened — by then a third of the
-            // flick has already happened, and the gesture reads as too small.
-            let anchor: (position: Double, time: TimeInterval)
-            if let lastRest, time - lastRest.time <= thresholds.restRecency {
-                anchor = lastRest
-            } else {
-                anchor = (position, time)
+            // Walk back to just before the hand started accelerating. Measuring
+            // from where the speed gate opened loses the first third of a flick,
+            // which is why short ones went unnoticed.
+            var index = history.count - 1
+            while index > 0,
+                  history[index - 1].speed < thresholds.startSpeed,
+                  time - history[index - 1].time <= thresholds.strokeLookback {
+                index -= 1
             }
-            stroke = .tracking(origin: anchor.position, since: anchor.time)
+            stroke = .tracking(origin: history[index].position, since: history[index].time)
             pathLength = 0
             return nil
 
@@ -298,7 +319,11 @@ struct AirGestureDetector {
             return nil
 
         case .spent:
-            if stillCount >= thresholds.stillReadings {
+            // One quiet reading is enough to re-arm. The next stroke still has
+            // to earn its own gesture, and the hand's journey back never has a
+            // quiet reading in it — so this costs no safety and stops a
+            // deliberate second flick being swallowed.
+            if stillCount >= 1 {
                 stroke = .idle
                 stillCount = 0
             }

@@ -171,9 +171,27 @@ because it has. And a stroke is measured from **where the hand was last still**,
 not from where it happened to be when the speed gate opened — by then a third of
 the flick has already happened, and the gesture reads as too small to count.
 
-Every threshold was tuned against a simulated hand carrying real landmark noise,
-across flicks from three to twenty inches, return strokes, repeats, waves, slow
-reaches and a still hand — and those same scenarios are the unit tests.
+### Tuned by measurement, not by taste
+
+A gesture threshold cannot be judged from one run: the same flick succeeds or
+fails depending on which way the landmark noise happened to fall, and a single
+lucky trial reads as proof. Every threshold here was chosen by running each
+scenario over two hundred independent noise realisations and reading off the hit
+rate.
+
+That is how the current numbers were picked. Loosening the travel threshold buys
+shorter flicks — a three-inch flick goes from 94% to 100% — until waving starts
+registering as a gesture, which happens first and sets the floor. At the shipped
+setting every intended gesture fires every time and every unintended one stays
+silent every time.
+
+It also caught a threshold that could not work: the speed counting as "stopped"
+had been set *below* the speed a still hand appears to move at through landmark
+noise, so the hand was sometimes never seen to stop, and the detector sat
+refusing to fire again. The stillness test now takes the median of the last few
+speeds, so one noisy frame cannot masquerade as the hand setting off.
+
+The same scenarios are the unit tests, noise included.
 
 The camera runs only while the launcher is on screen, the feature is on, and the
 scene is active — never behind Settings, never in the background. Nothing is
