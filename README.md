@@ -137,27 +137,43 @@ that never fires.
 A hand mid-flick is motion-blurred, and fingertips are the first landmarks to
 fall below confidence. Position and scale come from the wrist and knuckles
 alone, and the fingertip spread is optional — a reading without it still drives
-a swipe, and only the burst goes without. Tying the two together is what makes
-swipes stop registering exactly when one is being made.
+a swipe, and only the burst goes without.
 
-### What counts
+### Position and scale are smoothed apart
 
-`AirGestureDetector` decides, from how far the hand crossed, how fast, and how
-straight the path was. Reversing is treated differently from repeating: after a
-flick the hand has to come back, and that return journey is not a gesture — it
-is the cost of having made one.
+`HandReading` carries `x` and `span` separately, and the detector never divides
+one by the other until both have been smoothed. Dividing per frame folds the
+noise in the *scale* estimate into the *position*: a span wobbling by eight per
+cent moves a still hand by half a span — most of a flick — and that phantom
+speed is what made one flick sometimes move two apps.
 
-The way back is refused by watching for the hand to **come to rest**, not by
-running down a clock. A return stroke is one continuous movement and never
-pauses; deliberately changing your mind does. That means the flick itself can
-stay easy — four inches, briskly — without the journey home undoing it, which a
-plain cooldown cannot manage in both directions at once.
+Position goes through a [1€ filter](https://gery.casiez.net/1euro/), whose
+cutoff rises with speed: heavy smoothing while the hand is still, where jitter
+is the whole problem, and almost none while it is moving, where lag is. At the
+tuned settings it removes the jitter while giving back about ninety per cent of
+a short flick's travel — plain smoothing would eat a quarter of it, and a
+gesture only gets credit for the displacement that survives. The span is
+smoothed hard on its own: a hand does not change width, so anything moving there
+is measurement noise.
 
-It is a value type over plain numbers, so all of it is unit-tested by playing a
-hand through it frame by frame, with distances written in inches: a six-inch
-flick, a ten-inch flick, a three-inch nudge, the same distance taken slowly, a
-path that doubles back, a hand leaving the frame, a return stroke, a deliberate
-reverse, fingers thrown open, a hand already open, and a slow unfurl.
+### One movement, one gesture
+
+A threshold test fires the instant it is crossed and then re-arms on a timer, so
+a single long sweep can trip it twice and the journey back can trip it again.
+The detector is a state machine instead. A movement is a **stroke**: it opens
+when the hand starts moving, yields at most one gesture, and does not re-arm
+until the hand has come to rest. Starting and stopping use different speeds —
+hysteresis — so a hand hovering near the threshold cannot chatter across it.
+
+That single rule replaces every cooldown. The return stroke is silent because
+the hand has not stopped yet; a deliberate second flick works immediately
+because it has. And a stroke is measured from **where the hand was last still**,
+not from where it happened to be when the speed gate opened — by then a third of
+the flick has already happened, and the gesture reads as too small to count.
+
+Every threshold was tuned against a simulated hand carrying real landmark noise,
+across flicks from three to twenty inches, return strokes, repeats, waves, slow
+reaches and a still hand — and those same scenarios are the unit tests.
 
 The camera runs only while the launcher is on screen, the feature is on, and the
 scene is active — never behind Settings, never in the background. Nothing is

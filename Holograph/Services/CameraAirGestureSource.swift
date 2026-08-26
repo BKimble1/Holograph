@@ -304,8 +304,12 @@ private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBuff
         guard let span = span(from: observation, point: point) else { return nil }
         let centreX = knuckles.map(\.x).reduce(0, +) / Double(knuckles.count)
 
+        // x and span travel separately. Dividing here would fold the noise in
+        // the scale estimate into the position, which is most of a flick's worth
+        // of phantom movement on a hand that is not moving at all.
         return HandReading(
-            x: centreX / span,
+            x: centreX,
+            span: span,
             spread: spread(from: observation, span: span, point: point)
         )
     }

@@ -36,29 +36,92 @@ enum AirGesturePreferences {
     }
 }
 
+// MARK: - Smoothing
+
+/// The 1€ filter: a low-pass filter whose cutoff rises with speed.
+///
+/// Landmark positions from a camera jitter by a good fraction of an inch even
+/// when a hand is perfectly still, and plain smoothing trades that jitter for
+/// lag — which on a gesture this short eats the very displacement being
+/// measured. This filter smooths hard while the hand is still, where jitter is
+/// the whole problem, and barely at all while it is moving, where lag is.
+///
+/// Casiez, Roussel and Vogel, *1€ Filter: A Simple Speed-based Low-pass Filter
+/// for Noisy Input in Interactive Systems*, CHI 2012.
+struct OneEuroFilter {
+    /// Cutoff in hertz when the signal is still. Lower means steadier.
+    var minimumCutoff: Double = 1.5
+    /// How sharply the cutoff opens up with speed. Higher means less lag.
+    var speedCoefficient: Double = 2.5
+    /// Cutoff for the speed estimate itself.
+    var derivativeCutoff: Double = 1.0
+
+    private var value: Double?
+    private var derivative = 0.0
+    private var time: TimeInterval?
+
+    /// The exponential smoothing factor for a given cutoff over a given step.
+    private static func alpha(cutoff: Double, elapsed: TimeInterval) -> Double {
+        let tau = 1 / (2 * .pi * cutoff)
+        return 1 / (1 + tau / elapsed)
+    }
+
+    mutating func apply(_ sample: Double, at sampleTime: TimeInterval) -> Double {
+        guard let previous = value, let last = time, sampleTime > last else {
+            value = sample
+            time = sampleTime
+            derivative = 0
+            return sample
+        }
+
+        let elapsed = sampleTime - last
+        let rawDerivative = (sample - previous) / elapsed
+        let derivativeAlpha = Self.alpha(cutoff: derivativeCutoff, elapsed: elapsed)
+        derivative = derivativeAlpha * rawDerivative + (1 - derivativeAlpha) * derivative
+
+        // The whole idea: a faster signal gets a higher cutoff, so it is barely
+        // smoothed and barely delayed.
+        let cutoff = minimumCutoff + speedCoefficient * abs(derivative)
+        let smoothing = Self.alpha(cutoff: cutoff, elapsed: elapsed)
+        let smoothed = smoothing * sample + (1 - smoothing) * previous
+
+        value = smoothed
+        time = sampleTime
+        return smoothed
+    }
+
+    mutating func reset() {
+        value = nil
+        time = nil
+        derivative = 0
+    }
+}
+
 // MARK: - What the camera saw
 
-/// One frame's worth of hand, in units of its own size.
+/// One frame's worth of hand.
 ///
-/// Measuring against the hand rather than the frame is what makes the gesture
-/// work at any distance. The same flick covers twice as much of the frame at a
-/// foot as it does at two, but it is always the same number of knuckle-spans —
-/// so every threshold here is expressed in spans, and none of them care how far
-/// away the person is standing.
+/// `x` and `span` are both in frame units and deliberately kept apart. Dividing
+/// one by the other per frame — which an earlier version did — folds the noise
+/// in the *scale* estimate into the *position*: a span wobbling by eight per
+/// cent moves a still hand by half a span, which is most of a flick. The
+/// detector smooths each on its own terms and only then works in spans.
 struct HandReading: Equatable {
-    /// Where the hand sits across the frame, in spans from the left edge.
+    /// Where the hand sits across the frame, in frame units.
     var x: Double
-    /// How far the fingertips sit from their own centre, in spans — low when
-    /// they are gathered, high when the hand is open.
+    /// The hand's width across the knuckles, in the same units. The ruler.
+    var span: Double
+    /// How far the fingertips sit from their own centre, already in spans, or
+    /// `nil` when too few could be seen to tell an open hand from a shut one.
     ///
-    /// Optional, and that matters: a hand moving quickly is motion-blurred, and
+    /// Optional, and that matters: a hand mid-flick is motion-blurred and its
     /// fingertips are the first landmarks to lose confidence. Requiring them
-    /// would throw away the whole reading exactly when a swipe is happening. A
-    /// swipe needs only the knuckles; the fingertips are the burst's business.
+    /// would discard the whole reading exactly when a swipe is happening.
     var spread: Double?
 
-    init(x: Double, spread: Double? = nil) {
+    init(x: Double, span: Double, spread: Double? = nil) {
         self.x = x
+        self.span = span
         self.spread = spread
     }
 }
@@ -67,195 +130,209 @@ struct HandReading: Equatable {
 
 /// Turns a stream of hand readings into gestures.
 ///
+/// Built as a small state machine over a smoothed position, which is what stops
+/// one flick counting twice. A threshold test on its own fires the moment it is
+/// crossed and then re-arms on a timer, so a single long sweep can trip it more
+/// than once and the hand's journey back can trip it again. Here a movement is
+/// a *stroke*: it opens when the hand starts moving, yields at most one gesture,
+/// and does not re-arm until the hand has come to rest. Starting and stopping
+/// use different speeds — hysteresis — so a hand hovering near the threshold
+/// cannot chatter between the two.
+///
 /// The whole of the gesture logic, kept as a value type over plain numbers so it
-/// can be exercised without a camera, a hand, or a running app — the camera's
-/// only job is to supply readings and say when the hand is gone.
+/// can be exercised without a camera, a hand, or a running app.
 struct AirGestureDetector {
     struct Thresholds: Equatable {
-        /// How far the hand must travel, in its own spans. A hand is about three
-        /// inches across the knuckles, so this is roughly a four-inch flick — at
-        /// any distance from the screen.
-        var travelSpans: Double = 1.2
-        /// And how briskly, in spans per second: about seven inches a second.
-        var speedSpans: Double = 2.2
+        /// Speed, in spans per second, that opens a stroke. A hand is about
+        /// three inches across the knuckles, so this is roughly six inches a
+        /// second.
+        var startSpeed: Double = 2.0
+        /// And the lower speed that ends one. The gap between the two is the
+        /// hysteresis that stops a hovering hand chattering.
+        var stopSpeed: Double = 0.9
+        /// How far the hand must travel within a stroke, in spans — around two
+        /// and a half inches, at any distance from the screen.
+        var travelSpans: Double = 0.85
         /// How straight the path has to be: |net displacement| ÷ |path length|.
-        var straightness: Double = 0.65
-        /// Motion older than this is not part of the current flick.
-        var window: TimeInterval = 0.6
-        /// The shortest gesture worth believing; faster is jitter.
-        var minimumDuration: TimeInterval = 0.06
+        var straightness: Double = 0.55
+        /// Consecutive slow readings that count as the hand having stopped.
+        var stillReadings: Int = 2
+        /// A stroke that goes on longer than this is not a flick.
+        var maximumStrokeDuration: TimeInterval = 1.2
+        /// How stale the last resting position may be and still be used as the
+        /// start of a stroke.
+        var restRecency: TimeInterval = 0.35
+        /// A gap longer than this means the hand was lost and found again, not
+        /// that it moved instantly.
+        var maximumGap: TimeInterval = 0.4
 
-        /// Quiet time before the *same* flick counts again.
-        var repeatCooldown: TimeInterval = 0.4
-        /// Quiet time before the *opposite* flick counts — a backstop behind the
-        /// settle rule below, not the main defence.
-        var reverseCooldown: TimeInterval = 0.5
-        /// Below this, in spans per second, the hand is treated as at rest.
-        var settleSpeed: Double = 1.2
-        /// How many consecutive slow readings count as having come to rest.
-        var settleSamples: Int = 2
-
-        /// Fingers must gather at least this close before a burst can start.
+        /// Fingers must have been at least this close for a burst to count.
         /// Pinched fingertips sit about 0.13 spans from their centre.
-        var gatheredSpread: Double = 0.38
-        /// And open at least this wide to finish one. A fully splayed hand
-        /// reaches about 0.69, so this is comfortably inside what a hand does.
-        var burstSpread: Double = 0.50
+        var gatheredSpread: Double = 0.45
+        /// And must open at least this wide. A fully splayed hand reaches about
+        /// 0.69, so this sits comfortably inside what a hand can do.
+        var burstSpread: Double = 0.48
         /// Opening by less than this is a hand relaxing, not a burst.
-        var burstGrowth: Double = 0.28
-        /// A burst is a single quick action, not a slow unfurling. Half a second
-        /// is comfortably longer than throwing a hand open takes, and short
-        /// enough that a hand opening over a second never accumulates the growth
-        /// above inside one window.
+        var burstGrowth: Double = 0.25
+        /// A burst is one quick action, not a slow unfurling.
         var burstWindow: TimeInterval = 0.5
-        var burstCooldown: TimeInterval = 1.0
+        /// The fingers must come back below this before another burst counts,
+        /// so holding an open hand up does not launch things repeatedly.
+        var burstRearmSpread: Double = 0.42
 
-        /// Below this many samples there is not enough of a path to judge.
+        /// Below this many readings there is not enough of a shape to judge.
         var minimumSamples: Int = 3
 
         static let `default` = Thresholds()
     }
 
-    private struct Sample {
-        let reading: HandReading
-        let time: TimeInterval
+    /// Where a stroke is in its life.
+    private enum Stroke: Equatable {
+        /// Nothing is happening; a fast enough reading opens a stroke.
+        case idle
+        /// The hand is moving and has not yet earned a gesture.
+        case tracking(origin: Double, since: TimeInterval)
+        /// A gesture has been given for this movement. Nothing more can fire
+        /// until the hand comes to rest — which is what makes the journey back
+        /// silent without having to guess how long it takes.
+        case spent
     }
 
-    private var samples: [Sample] = []
-    private var lastGesture: (kind: AirGesture, time: TimeInterval)?
-    /// Whether the hand has come to rest since the last gesture. Reversing waits
-    /// on this rather than on the clock — see `isAllowed`.
-    private var hasSettled = true
-    private var slowReadings = 0
     let thresholds: Thresholds
+
+    private var positionFilter = OneEuroFilter()
+    private var smoothedSpan: Double?
+    private var previous: (position: Double, time: TimeInterval)?
+    private var lastRest: (position: Double, time: TimeInterval)?
+    private var stroke: Stroke = .idle
+    private var stillCount = 0
+    private var pathLength = 0.0
+
+    private var spreads: [(value: Double, time: TimeInterval)] = []
+    private var burstArmed = true
 
     init(thresholds: Thresholds = .default) {
         self.thresholds = thresholds
     }
 
-    /// Feeds one observation. Returns a gesture on the frame that completes it.
+    /// Feeds one observation. Returns a gesture on the reading that completes it.
     mutating func handSeen(_ reading: HandReading, time: TimeInterval) -> AirGesture? {
-        // Out-of-order frames would corrupt the path; the camera can deliver
-        // them after a stall.
-        if let last = samples.last, time <= last.time { return nil }
+        if let previous, time <= previous.time { return nil }
+        // A long gap is a hand that went away and came back. Carrying the old
+        // position across it would invent a very fast, very long swipe.
+        if let previous, time - previous.time > thresholds.maximumGap { handLost() }
+        guard reading.span > 0 else { return nil }
 
-        trackSettling(towards: reading, at: time)
-        samples.append(Sample(reading: reading, time: time))
-        samples.removeAll { time - $0.time > max(thresholds.window, thresholds.burstWindow) }
+        // The span is smoothed hard: a hand does not change width, so anything
+        // that moves here is measurement noise.
+        let span = smoothedSpan.map { $0 * 0.75 + reading.span * 0.25 } ?? reading.span
+        smoothedSpan = span
 
-        // A burst happens in place, so it is checked first: a hand that has
-        // barely moved cannot be mid-flick anyway.
-        if let burst = burst(at: time) { return fire(burst, at: time) }
-        if let swipe = swipe(at: time) { return fire(swipe, at: time) }
-        return nil
+        let position = positionFilter.apply(reading.x, at: time) / span
+        let speed = previous.map { abs(position - $0.position) / max(time - $0.time, 1e-6) } ?? 0
+        if let previous { pathLength += abs(position - previous.position) }
+
+        // The burst is checked first: it happens with the hand still, so a hand
+        // that could be mid-burst is not mid-flick.
+        let gesture = burst(reading.spread, at: time) ?? swipe(position: position, speed: speed, at: time)
+        previous = (position, time)
+        return gesture
     }
 
-    /// The hand left the frame. Whatever path was building is not a gesture —
-    /// and a hand that has gone away has certainly stopped moving.
+    /// The hand left the frame. Whatever was building is not a gesture, and a
+    /// hand that has gone has certainly stopped moving.
     mutating func handLost() {
-        samples.removeAll()
-        hasSettled = true
-        slowReadings = 0
-    }
-
-    /// Notices the hand coming to rest.
-    ///
-    /// This is what separates a flick from the journey back. After a gesture the
-    /// hand has to return to where it started, and that return is one continuous
-    /// movement — it never pauses. Requiring a pause before the opposite
-    /// direction counts lets the flick itself stay easy without the way back
-    /// undoing it.
-    private mutating func trackSettling(towards reading: HandReading, at time: TimeInterval) {
-        guard let previous = samples.last else { return }
-        let elapsed = time - previous.time
-        guard elapsed > 0 else { return }
-
-        let speed = abs(reading.x - previous.reading.x) / elapsed
-        slowReadings = speed <= thresholds.settleSpeed ? slowReadings + 1 : 0
-        if slowReadings >= thresholds.settleSamples { hasSettled = true }
+        positionFilter.reset()
+        smoothedSpan = nil
+        previous = nil
+        lastRest = nil
+        stroke = .idle
+        stillCount = 0
+        pathLength = 0
+        spreads.removeAll()
     }
 
     /// Exposed for tests; the camera never needs it.
-    var sampleCount: Int { samples.count }
-
-    // MARK: - Recognition
-
-    private func swipe(at time: TimeInterval) -> AirGesture? {
-        let recent = samples.filter { time - $0.time <= thresholds.window }
-        guard recent.count >= thresholds.minimumSamples,
-              let first = recent.first, let last = recent.last else { return nil }
-
-        let displacement = last.reading.x - first.reading.x
-        let duration = time - first.time
-        guard duration >= thresholds.minimumDuration else { return nil }
-
-        let distance = abs(displacement)
-        guard distance >= thresholds.travelSpans,
-              distance / duration >= thresholds.speedSpans else { return nil }
-
-        // Total variation: how far the hand actually travelled, doubling back
-        // included. A flick's displacement is nearly all of it.
-        var pathLength = 0.0
-        for index in 1..<recent.count {
-            pathLength += abs(recent[index].reading.x - recent[index - 1].reading.x)
-        }
-        guard pathLength > 0, distance / pathLength >= thresholds.straightness else { return nil }
-
-        let direction: AirSwipe = displacement > 0 ? .right : .left
-        guard isAllowed(.swipe(direction), at: time) else { return nil }
-        return .swipe(direction)
+    var isMidStroke: Bool {
+        if case .tracking = stroke { return true }
+        return false
     }
 
-    private func burst(at time: TimeInterval) -> AirGesture? {
+    // MARK: - Swipes
+
+    private mutating func swipe(position: Double, speed: Double, at time: TimeInterval) -> AirGesture? {
+        let isStill = speed <= thresholds.stopSpeed
+        if isStill { lastRest = (position, time) }
+        stillCount = isStill ? stillCount + 1 : 0
+
+        switch stroke {
+        case .idle:
+            guard speed >= thresholds.startSpeed else { return nil }
+            // Measured from where the hand was last still, not from where it
+            // happened to be when the speed gate opened — by then a third of the
+            // flick has already happened, and the gesture reads as too small.
+            let anchor: (position: Double, time: TimeInterval)
+            if let lastRest, time - lastRest.time <= thresholds.restRecency {
+                anchor = lastRest
+            } else {
+                anchor = (position, time)
+            }
+            stroke = .tracking(origin: anchor.position, since: anchor.time)
+            pathLength = 0
+            return nil
+
+        case let .tracking(origin, since):
+            let displacement = position - origin
+            let distance = abs(displacement)
+            if distance >= thresholds.travelSpans,
+               pathLength > 0, distance / pathLength >= thresholds.straightness {
+                stroke = .spent
+                stillCount = 0
+                return .swipe(displacement > 0 ? .right : .left)
+            }
+            // Ran out of movement, or went on too long to be a flick.
+            if stillCount >= thresholds.stillReadings || time - since > thresholds.maximumStrokeDuration {
+                stroke = .idle
+                stillCount = 0
+            }
+            return nil
+
+        case .spent:
+            if stillCount >= thresholds.stillReadings {
+                stroke = .idle
+                stillCount = 0
+            }
+            return nil
+        }
+    }
+
+    // MARK: - Bursts
+
+    private mutating func burst(_ spread: Double?, at time: TimeInterval) -> AirGesture? {
         // Readings whose fingertips could not be resolved say nothing about
-        // whether the hand is open, so they are skipped rather than treated as
-        // closed.
-        let recent = samples.filter { time - $0.time <= thresholds.burstWindow && $0.reading.spread != nil }
-        guard recent.count >= thresholds.minimumSamples,
-              let last = recent.last, let openSpread = last.reading.spread,
-              openSpread >= thresholds.burstSpread else { return nil }
+        // whether the hand is open, so they are skipped rather than counted shut.
+        if let spread { spreads.append((spread, time)) }
+        spreads.removeAll { time - $0.time > thresholds.burstWindow }
 
-        // The tightest the fingers got before opening. Anything after the
-        // gathering is the burst itself.
-        guard let gathered = recent.dropLast().min(by: { ($0.reading.spread ?? 1) < ($1.reading.spread ?? 1) }),
-              let gatheredSpread = gathered.reading.spread,
-              gatheredSpread <= thresholds.gatheredSpread,
-              gathered.time < last.time else { return nil }
+        guard let current = spreads.last?.value else { return nil }
 
-        let growth = openSpread - gatheredSpread
-        guard growth >= thresholds.burstGrowth else { return nil }
-        guard isAllowed(.burst, at: time) else { return nil }
-        return .burst
-    }
-
-    /// Whether a gesture is clear of whatever fired last.
-    ///
-    /// The asymmetry is the point. Repeating the same flick is deliberate and
-    /// should feel immediate; reversing is what a hand does on its way back to
-    /// where it started, and almost never what was meant.
-    private func isAllowed(_ gesture: AirGesture, at time: TimeInterval) -> Bool {
-        guard let lastGesture else { return true }
-        let elapsed = time - lastGesture.time
-
-        switch (lastGesture.kind, gesture) {
-        case (.burst, _), (_, .burst):
-            return elapsed >= thresholds.burstCooldown
-        case let (.swipe(previous), .swipe(next)) where previous == next:
-            return elapsed >= thresholds.repeatCooldown
-        case (.swipe, .swipe):
-            // The opposite way needs the hand to have actually stopped first.
-            // A cooldown alone either blocks a deliberate reverse or lets the
-            // return stroke through, depending on how fast the person moves.
-            return hasSettled && elapsed >= thresholds.reverseCooldown
+        guard burstArmed else {
+            // Re-arms only once the fingers close again, so an open hand held up
+            // does not keep launching things.
+            if current <= thresholds.burstRearmSpread { burstArmed = true }
+            return nil
         }
-    }
 
-    private mutating func fire(_ gesture: AirGesture, at time: TimeInterval) -> AirGesture {
-        lastGesture = (gesture, time)
-        samples.removeAll()
-        hasSettled = false
-        slowReadings = 0
-        return gesture
+        // Key paths cannot index tuple elements, hence the explicit closure.
+        let earlier = spreads.dropLast().map { $0.value }
+        guard spreads.count >= thresholds.minimumSamples,
+              current >= thresholds.burstSpread,
+              let gathered = earlier.min(),
+              gathered <= thresholds.gatheredSpread,
+              current - gathered >= thresholds.burstGrowth else { return nil }
+
+        burstArmed = false
+        return .burst
     }
 }
 
