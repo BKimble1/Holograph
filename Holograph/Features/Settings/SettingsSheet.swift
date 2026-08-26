@@ -393,6 +393,16 @@ struct SettingsSheet: View {
                 Label("Say the App Name", systemImage: "speaker.wave.2")
             }
             .accessibilityIdentifier(AccessibilityID.spokenLaunch)
+
+            // A switch that is on while nothing happens looks broken. If the
+            // neural voice is not installed, say so here rather than leaving
+            // the user with unexplained silence.
+            if spokenLaunchEnabled, let reason = services.sound.spokenLaunchUnavailableReason {
+                Label(reason, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(AccessibilityID.spokenLaunchUnavailable)
+            }
         } header: {
             Text("Sound")
         } footer: {

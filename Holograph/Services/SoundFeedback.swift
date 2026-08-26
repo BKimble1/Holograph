@@ -27,6 +27,12 @@ protocol SoundPlaying: AnyObject {
     /// Renders the announcements for the library ahead of time, so the first
     /// launch after opening the app is as quick as the tenth. Never blocking.
     func prepareAnnouncements(for items: [LauncherItem]) async
+
+    /// Why spoken launch will say nothing, or `nil` when it will.
+    ///
+    /// Silence with no explanation is the worst of both worlds — the switch
+    /// looks broken. Settings shows this underneath it.
+    var spokenLaunchUnavailableReason: String? { get }
     /// Cuts any announcement still in flight, so leaving mid-sentence is quiet.
     func cancelSpeech()
 
@@ -385,8 +391,6 @@ final class SystemSound: SoundPlaying {
         speaking = nil
     }
 
-    /// Whether spoken launch will actually say anything, and why not if it
-    /// will not. Settings shows this rather than leaving unexplained silence.
     var spokenLaunchUnavailableReason: String? { speech.unavailableReason }
 
     private func play(_ phrase: SpokenPhrase) {
@@ -456,6 +460,7 @@ final class SystemSound: SoundPlaying {
 @MainActor
 final class SystemSound: SoundPlaying {
     var onOwnSound: ((TimeInterval) -> Void)?
+    var spokenLaunchUnavailableReason: String? { "This platform has no speech." }
 
     init(speech: NeuralSpeaking) {}
 
@@ -474,6 +479,7 @@ final class SystemSound: SoundPlaying {
 @MainActor
 final class SilentSound: SoundPlaying {
     var onOwnSound: ((TimeInterval) -> Void)?
+    var spokenLaunchUnavailableReason: String?
 
     private(set) var tickCount = 0
     private(set) var announcements: [String] = []
