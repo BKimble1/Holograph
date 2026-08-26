@@ -109,7 +109,11 @@ struct ClapDetector {
         /// pair in a rhythm is cancelled by the one that comes next. It costs
         /// this much delay before an app opens, which is the price of not
         /// opening apps to a drum track.
-        var holdOff: TimeInterval = 0.40
+        ///
+        /// It has to outlast the gap between beats to catch the next one, and at
+        /// this length an app still opens within about eight tenths of a second
+        /// of the first clap.
+        var holdOff: TimeInterval = 0.45
         /// And silence required before it — including since the last double clap
         /// was reported, so a rhythm cannot fire once per bar.
         var leadIn: TimeInterval = 1.0
@@ -198,6 +202,12 @@ struct ClapDetector {
                   decibels >= thresholds.absoluteLevel,
                   decibels - wasAt >= thresholds.attackRise {
             pendingOnset = readingTime
+            // A pair waiting out its hold-off is waiting for silence, and this
+            // is not silence. Cancelling here rather than on the confirmation a
+            // tenth of a second later is what catches the next beat of a rhythm
+            // in time — waiting for it to finish let a beat that started inside
+            // the hold-off arrive too late to stop the launch.
+            reportAt = nil
         }
 
         if let deadline = reportAt, readingTime >= deadline {
