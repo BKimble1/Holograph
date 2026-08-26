@@ -12,6 +12,7 @@ struct LauncherScreen: View {
     @FocusState private var isStageFocused: Bool
     @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
     @AppStorage(ClapPreferences.enabledKey) private var clapToOpenEnabled = false
+    @AppStorage(HeadTrackingPreferences.enabledKey) private var headTrackingEnabled = false
 
     var body: some View {
         // The backdrop is a sibling of the stage rather than a layer inside it.
@@ -21,7 +22,11 @@ struct LauncherScreen: View {
         // along the top edge. Out here it bleeds to the physical edges, while
         // the stage and its controls keep their safe-area geometry.
         ZStack {
+            // The furthest layer, and so the slowest: the environment behind
+            // the wall drifts a little as the viewer moves, which is most of
+            // what sells the depth.
             HoloBackgroundView()
+                .offset(scaledPerspective.offset(depth: 0.30, travel: 34))
 
             GeometryReader { proxy in
                 let layout = LauncherLayout(size: proxy.size)
@@ -40,6 +45,24 @@ struct LauncherScreen: View {
                     }
 
                     stage(layout: layout)
+                        // The wall itself: nearer than the background, so it
+                        // moves more, and turned very slightly towards wherever
+                        // the viewer is sitting.
+                        .offset(scaledPerspective.offset(depth: 1.0, travel: 18))
+                        .rotation3DEffect(
+                            .degrees(scaledPerspective.rotation(maximum: 4.5)),
+                            axis: (x: 0, y: 1, z: 0),
+                            anchor: .center,
+                            anchorZ: 0,
+                            perspective: 0.5
+                        )
+                        .rotation3DEffect(
+                            .degrees(-scaledPerspective.y * scaledPerspective.strength * 2.6),
+                            axis: (x: 1, y: 0, z: 0),
+                            anchor: .center,
+                            anchorZ: 0,
+                            perspective: 0.5
+                        )
 
                     if model.openFolder == nil {
                         settingsButton
@@ -72,12 +95,14 @@ struct LauncherScreen: View {
         // and never in the background.
         .onChange(of: airGesturesEnabled, initial: true) { _, _ in updateAirGestures() }
         .onChange(of: clapToOpenEnabled, initial: true) { _, _ in updateClapListening() }
+        .onChange(of: headTrackingEnabled, initial: true) { _, _ in updateHeadTracking() }
         .onChange(of: motion.isSceneActive) { _, _ in updateAmbientInput() }
         .onChange(of: isSettingsPresented) { _, _ in updateAmbientInput() }
         .onChange(of: model.browsing?.id) { _, _ in updateAmbientInput() }
         .onDisappear {
             services.airGestures.stop()
             services.claps.stop()
+            services.headTracking.stop()
         }
         .sheet(isPresented: $isSettingsPresented, onDismiss: { settingsRoute = nil }) {
             SettingsSheet(initialRoute: settingsRoute)
@@ -259,9 +284,20 @@ struct LauncherScreen: View {
         )
     }
 
+    /// How much of the viewing position to actually apply. Reduce Motion and
+    /// the test harness both go through `HoloMotion` rather than being decided
+    /// again here.
+    private var scaledPerspective: HeadPerspective {
+        let scale = motion.headParallaxScale
+        guard scale > 0 else { return .neutral }
+        let live = motion.headPerspective
+        return HeadPerspective(x: live.x, y: live.y, strength: live.strength * scale)
+    }
+
     private func updateAmbientInput() {
         updateAirGestures()
         updateClapListening()
+        updateHeadTracking()
     }
 
     /// Whether the launcher is in a position to be watching or listening at all.
@@ -307,6 +343,26 @@ struct LauncherScreen: View {
             Task { await model.launchSelected() }
         }
         services.claps.start()
+    }
+
+    private func updateHeadTracking() {
+        let motion = motion
+        guard headTrackingEnabled, isForeground else {
+            services.headTracking.stop()
+            // Whatever the last frame said, straight-on is where a scene nobody
+            // is watching belongs.
+            withAnimation(.easeOut(duration: 0.45)) { motion.headPerspective = .neutral }
+            return
+        }
+        // Only the object is captured, never the view: this handler outlives
+        // any particular body evaluation.
+        services.headTracking.onPerspective = { next in
+            // No animation: the tracker has already smoothed this, and layering
+            // a second smoother on top is what makes head tracking feel like
+            // syrup rather than glass.
+            motion.headPerspective = next
+        }
+        services.headTracking.start()
     }
 
     private func moveSelection(by delta: Int) {

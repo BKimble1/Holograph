@@ -143,85 +143,13 @@ final class HoloClickWAVTests: XCTestCase {
     func testTheSamplesSurviveTheRoundTripToPCM() {
         let source = HoloClick.waveform()
         for (index, expected) in source.enumerated() {
-            let offset = HoloClick.headerByteCount + index * 2
+            let offset = PCMWaveWriter.headerByteCount + index * 2
             let stored = Int16(bitPattern: uint16(at: offset))
             XCTAssertEqual(
                 Float(stored) / 32_767, expected, accuracy: 0.001,
                 "sample \(index) should survive quantisation"
             )
         }
-    }
-}
-
-/// Which voices exist varies by device and by what the owner has downloaded, so
-/// the ranking is tested over descriptions rather than the real voice list.
-final class HoloVoiceTests: XCTestCase {
-    private func candidate(
-        _ name: String,
-        _ language: String = "en-GB",
-        gender: HoloVoice.ReportedGender = .unspecified,
-        quality: Int = 1
-    ) -> HoloVoice.Candidate {
-        HoloVoice.Candidate(
-            identifier: "id.\(name)", name: name,
-            language: language, reportedGender: gender, quality: quality
-        )
-    }
-
-    func testItPrefersABritishMan() {
-        let chosen = HoloVoice.best(from: [
-            candidate("Serena"),
-            candidate("Alex", "en-US"),
-            candidate("Daniel"),
-        ])
-        XCTAssertEqual(chosen?.name, "Daniel")
-    }
-
-    func testAManIsPreferredOverABritishWoman() {
-        // The character is the voice, not the passport. An English-speaking man
-        // is a nearer miss than a British woman.
-        let chosen = HoloVoice.best(from: [
-            candidate("Serena", "en-GB", quality: 3),
-            candidate("Alex", "en-US", quality: 1),
-        ])
-        XCTAssertEqual(chosen?.name, "Alex")
-    }
-
-    func testNamesDecideGenderWhenTheSystemWillNotSay() {
-        // Plenty of installed voices report no gender at all, so a ranking that
-        // trusts the API alone takes whoever happens to be installed.
-        XCTAssertTrue(HoloVoice.isMale(candidate("Daniel", gender: .unspecified)))
-        XCTAssertFalse(HoloVoice.isMale(candidate("Serena", gender: .unspecified)))
-    }
-
-    func testAKnownWomansNameIsNotOverriddenByTheSystem() {
-        XCTAssertFalse(HoloVoice.isMale(candidate("Serena", gender: .male)))
-    }
-
-    func testTheSystemDecidesForVoicesItDoesNotRecognise() {
-        XCTAssertTrue(HoloVoice.isMale(candidate("Unheard-of", gender: .male)))
-        XCTAssertFalse(HoloVoice.isMale(candidate("Unheard-of", gender: .female)))
-    }
-
-    func testAccentSeparatesTwoMen() {
-        let chosen = HoloVoice.best(from: [
-            candidate("Alex", "en-US", quality: 3),
-            candidate("Oliver", "en-GB", quality: 1),
-        ])
-        XCTAssertEqual(chosen?.name, "Oliver")
-    }
-
-    func testAmongEqualsTheBetterRecordingWins() {
-        let chosen = HoloVoice.best(from: [
-            candidate("Daniel", quality: 1),
-            candidate("Daniel", quality: 3),
-        ])
-        XCTAssertEqual(chosen?.quality, 3)
-    }
-
-    func testNoEnglishVoiceLeavesTheChoiceToTheSystem() {
-        XCTAssertNil(HoloVoice.best(from: [candidate("Thomas", "fr-FR")]))
-        XCTAssertNil(HoloVoice.best(from: []))
     }
 }
 
@@ -274,29 +202,6 @@ final class SoundPreferencesTests: XCTestCase {
     }
 }
 
-/// The launcher's own speaker is the loudest thing in the microphone's world,
-/// so whoever is listening has to be told how long to look away for.
-final class SpokenDurationTests: XCTestCase {
-    func testItAllowsForTheWholePhrase() {
-        // Erring long is the safe direction: too short and the tail of
-        // "Opening…" gets heard as something happening in the room.
-        let estimate = SystemSound.spokenDuration(of: "Opening Truebearing")
-        XCTAssertGreaterThan(estimate, 1.6, "the phrase itself takes about this long to say")
-    }
-
-    func testALongerNameTakesLonger() {
-        XCTAssertGreaterThan(
-            SystemSound.spokenDuration(of: "Opening Photogrammetry Workbench"),
-            SystemSound.spokenDuration(of: "Opening Mail")
-        )
-    }
-
-    func testItNeverAsksForSilenceForeverOrNotAtAll() {
-        XCTAssertGreaterThan(SystemSound.spokenDuration(of: ""), 0)
-        XCTAssertLessThanOrEqual(SystemSound.spokenDuration(of: String(repeating: "a", count: 500)), 6)
-    }
-}
-
 @MainActor
 final class SilentSoundTests: XCTestCase {
     func testItRecordsWhatItWasAskedToPlay() {
@@ -305,11 +210,11 @@ final class SilentSoundTests: XCTestCase {
         sound.onOwnSound = { announced.append($0) }
         sound.selectionTick()
         sound.selectionTick()
-        sound.announceLaunch(of: "Truebearing")
+        sound.announceLaunch(of: LauncherItem(name: "Truebearing", launchURL: URL(string: "a://b")))
         sound.cancelSpeech()
 
         XCTAssertEqual(sound.tickCount, 2)
-        XCTAssertEqual(sound.announcements, ["Truebearing"])
+        XCTAssertEqual(sound.announcements, ["Opening Truebearing"])
         XCTAssertEqual(sound.cancelCount, 1)
         XCTAssertTrue(announced.isEmpty, "a silent sound has nothing for the microphone to ignore")
     }

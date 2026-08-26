@@ -17,8 +17,16 @@ import UIKit
 protocol SoundPlaying: AnyObject {
     /// The carousel settled on a different app.
     func selectionTick()
-    /// An app is opening. Announced aloud, e.g. "Opening Truebearing".
-    func announceLaunch(of name: String)
+    /// An item is opening. Announced aloud, e.g. "Opening Truebearing".
+    ///
+    /// Takes the item rather than the name so a rendering can be cached against
+    /// its identity — and so a folder, which is not going anywhere, can be
+    /// left unannounced without every caller having to know that rule.
+    func announceLaunch(of item: LauncherItem)
+
+    /// Renders the announcements for the library ahead of time, so the first
+    /// launch after opening the app is as quick as the tenth. Never blocking.
+    func prepareAnnouncements(for items: [LauncherItem]) async
     /// Cuts any announcement still in flight, so leaving mid-sentence is quiet.
     func cancelSpeech()
 
@@ -216,11 +224,29 @@ enum HoloClick {
     /// wiring an engine graph for a 60 ms sound, and the file never touches
     /// disk. Pure, so the container can be checked byte for byte in tests.
     static func wavData() -> Data {
-        let samples = waveform()
+        PCMWaveWriter.wavData(samples: waveform(), sampleRate: sampleRate)
+    }
+
+    static let headerByteCount = PCMWaveWriter.headerByteCount
+}
+
+// MARK: - Wrapping samples for playback
+
+/// Wraps mono float samples in a RIFF/WAVE container.
+///
+/// `AVAudioPlayer` takes finished bytes, not buffers, and a malformed header is
+/// silence with no error — so this is deliberately one small function with the
+/// container spelled out, shared by the carousel tick and the spoken
+/// announcements rather than written twice.
+enum PCMWaveWriter {
+    static let headerByteCount = PCMWaveWriter.headerByteCount
+
+    static func wavData(samples: [Float], sampleRate: Double) -> Data {
         let channels = 1
         let bitsPerSample = 16
         let bytesPerSample = bitsPerSample / 8
-        let byteRate = Int(sampleRate) * channels * bytesPerSample
+        let rate = Int(sampleRate.rounded())
+        let byteRate = rate * channels * bytesPerSample
         let blockAlign = channels * bytesPerSample
         let dataSize = samples.count * bytesPerSample
 
@@ -244,7 +270,7 @@ enum HoloClick {
         append32(16)                     // PCM fmt chunk size
         append16(1)                      // format: uncompressed PCM
         append16(channels)
-        append32(Int(sampleRate))
+        append32(rate)
         append32(byteRate)
         append16(blockAlign)
         append16(bitsPerSample)
@@ -257,97 +283,13 @@ enum HoloClick {
         }
         return data
     }
-
-    /// RIFF + fmt + data headers, before any samples.
-    static let headerByteCount = 44
-}
-
-// MARK: - The voice
-
-/// Picks the voice the launcher speaks in: a British man, measured and dry —
-/// the register of an assistant who has already done the thinking.
-///
-/// The choice is made over plain descriptions rather than `AVSpeechSynthesisVoice`
-/// so the ranking can be tested. Which voices exist depends on the device and on
-/// what the owner has downloaded, so this has to degrade rather than assume.
-enum HoloVoice {
-    enum ReportedGender: Equatable {
-        case female
-        case male
-        case unspecified
-    }
-
-    struct Candidate: Equatable {
-        let identifier: String
-        let name: String
-        /// BCP-47, e.g. "en-GB".
-        let language: String
-        let reportedGender: ReportedGender
-        /// AVSpeechSynthesisVoiceQuality's raw value: default 1, enhanced 2,
-        /// premium 3. Higher sounds markedly less synthetic, which matters more
-        /// here than anywhere else — the whole effect is the delivery.
-        let quality: Int
-    }
-
-    /// Apple's English voices, by name.
-    ///
-    /// The API's own gender is not enough: plenty of installed voices report
-    /// `.unspecified`, so a ranking that trusts it alone ends up choosing on
-    /// quality and accent and taking whoever happens to be there. Naming them is
-    /// what makes the choice deliberate.
-    static let maleNames: Set<String> = [
-        "Daniel", "Oliver", "Arthur", "Malcolm", "Graham",
-        "Alex", "Fred", "Tom", "Aaron", "Rishi", "Gordon", "Lee",
-    ]
-
-    static let femaleNames: Set<String> = [
-        "Serena", "Stephanie", "Kate", "Martha", "Fiona", "Emily",
-        "Samantha", "Ava", "Allison", "Susan", "Zoe", "Nicky",
-        "Karen", "Catherine", "Moira", "Tessa",
-    ]
-
-    /// British men, best first. Daniel is Apple's long-standing Received
-    /// Pronunciation voice and by far the closest thing on the device to the
-    /// unhurried English butler the brief asks for.
-    static let preferredNames = ["Daniel", "Oliver", "Arthur", "Graham", "Malcolm"]
-
-    static func isMale(_ candidate: Candidate) -> Bool {
-        if femaleNames.contains(candidate.name) { return false }
-        if maleNames.contains(candidate.name) { return true }
-        return candidate.reportedGender == .male
-    }
-
-    /// Picks the best available voice, or `nil` to let the system choose.
-    static func best(from candidates: [Candidate]) -> Candidate? {
-        let english = candidates.filter { $0.language.hasPrefix("en") }
-        guard !english.isEmpty else { return nil }
-        return english.max { first, second in
-            rank(first).lexicographicallyPrecedes(rank(second))
-        }
-    }
-
-    /// Higher sorts better.
-    ///
-    /// Being a man outranks the accent: an English-speaking man is a nearer miss
-    /// than a British woman, and a device with no British voice installed should
-    /// still sound like the same character.
-    private static func rank(_ candidate: Candidate) -> [Int] {
-        let namePreference = preferredNames.firstIndex(of: candidate.name)
-            .map { preferredNames.count - $0 } ?? 0
-        return [
-            isMale(candidate) ? 1 : 0,
-            candidate.language.hasPrefix("en-GB") ? 1 : 0,
-            namePreference,
-            candidate.quality,
-        ]
-    }
 }
 
 // MARK: - The real thing
 
 #if canImport(AVFoundation)
 
-/// Plays the tick from an in-memory WAV and speaks through `AVSpeechSynthesizer`.
+/// Plays the tick and the spoken announcements, both as in-memory WAVs.
 ///
 /// Everything here is best-effort: nothing is built during launch, and any
 /// failure leaves the launcher silent rather than broken.
@@ -355,8 +297,13 @@ enum HoloVoice {
 final class SystemSound: SoundPlaying {
     var onOwnSound: ((TimeInterval) -> Void)?
 
-    private let synthesizer = AVSpeechSynthesizer()
+    private let speech: NeuralSpeaking
     private let logger = Logger(subsystem: "com.idlery.holograph", category: "sound")
+    private var announcements = AnnouncementCache()
+    /// The announcement currently being spoken, so leaving mid-sentence is
+    /// quiet.
+    private var speaking: AVAudioPlayer?
+    private var isPreparing = false
 
     /// A small pool, so a quick flick through the carousel still sounds like one
     /// tick per app instead of each one cutting off the last.
@@ -364,10 +311,13 @@ final class SystemSound: SoundPlaying {
     private var rotation = 0
     private var buildAttempts = 0
     private var hasConfiguredSession = false
-    private var cachedVoice: AVSpeechSynthesisVoice?
 
     private static let poolSize = 3
     private static let maximumBuildAttempts = 3
+
+    init(speech: NeuralSpeaking) {
+        self.speech = speech
+    }
 
     func selectionTick() {
         guard SoundPreferences.effectsEnabled, let player = availablePlayer() else { return }
@@ -378,67 +328,84 @@ final class SystemSound: SoundPlaying {
         onOwnSound?(0.25)
     }
 
-    func announceLaunch(of name: String) {
+    func announceLaunch(of item: LauncherItem) {
         guard SoundPreferences.spokenLaunchEnabled else { return }
+        guard let phrase = LaunchAnnouncement.phrase(for: item) else { return }
         #if canImport(UIKit)
         // VoiceOver is already describing what the user just did; talking over
         // it would be worse than saying nothing.
         guard !UIAccessibility.isVoiceOverRunning else { return }
         #endif
-        configureSessionIfNeeded()
 
-        let utterance = AVSpeechUtterance(string: "Opening \(name)")
-        utterance.voice = preferredVoice()
-        // Unhurried and level. The default rate clips along, and a raised pitch
-        // reads as eager; neither is the register wanted here.
-        // Slower and a shade lower than default. The character is composure:
-        // nothing it says is news to it.
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.90
-        utterance.pitchMultiplier = 0.92
-        utterance.postUtteranceDelay = 0
-        utterance.volume = 0.95
-        synthesizer.speak(utterance)
-        onOwnSound?(Self.spokenDuration(of: utterance.speechString))
+        let key = LaunchAnnouncement.cacheKey(for: item)
+        // The common case: already rendered, so this is a buffer lookup and a
+        // play call, and the app opens on exactly its usual schedule.
+        if let ready = announcements.phrase(forKey: key) {
+            play(ready)
+            return
+        }
+        // The uncommon one. Rendering is started, but nothing waits for it —
+        // the launch ceremony is already running and the app is already on its
+        // way. If the phrase arrives in time it is heard; if it does not, it is
+        // ready for next time.
+        Task { [weak self] in
+            guard let self, let rendered = await speech.render(phrase) else { return }
+            announcements.store(rendered, forKey: key)
+            play(rendered)
+        }
     }
 
-    /// Roughly how long a phrase takes at the rate above. Only ever used to
-    /// decide how long to stop listening for, so approximate is enough — and
-    /// erring long is the safe direction.
-    ///
-    /// Arithmetic on a string, so it belongs to nobody in particular.
-    nonisolated static func spokenDuration(of phrase: String) -> TimeInterval {
-        min(6, 1.2 + Double(phrase.count) * 0.075)
+    func prepareAnnouncements(for items: [LauncherItem]) async {
+        guard !isPreparing else { return }
+        isPreparing = true
+        defer { isPreparing = false }
+
+        await speech.prepare()
+        guard speech.isReady else { return }
+
+        // Anything renamed or removed since last time is no longer reachable.
+        let live = Set(items.map(LaunchAnnouncement.cacheKey(for:)))
+        announcements.keepOnly(live)
+
+        for item in items {
+            guard let phrase = LaunchAnnouncement.phrase(for: item) else { continue }
+            let key = LaunchAnnouncement.cacheKey(for: item)
+            guard !announcements.contains(key) else { continue }
+            guard let rendered = await speech.render(phrase) else { continue }
+            announcements.store(rendered, forKey: key)
+            // One at a time, at low priority, yielding between: this runs while
+            // somebody is looking at the launcher.
+            await Task.yield()
+        }
     }
 
     func cancelSpeech() {
-        guard synthesizer.isSpeaking else { return }
-        synthesizer.stopSpeaking(at: .immediate)
+        speaking?.stop()
+        speaking = nil
     }
 
-    /// Resolved once — enumerating every installed voice on each launch would be
-    /// wasted work — and `nil` if nothing suitable exists, which leaves the
-    /// system to pick rather than saying nothing.
-    private func preferredVoice() -> AVSpeechSynthesisVoice? {
-        if let cachedVoice { return cachedVoice }
-        let candidates = AVSpeechSynthesisVoice.speechVoices().map { voice in
-            let gender: HoloVoice.ReportedGender
-            switch voice.gender {
-            case .female: gender = .female
-            case .male: gender = .male
-            default: gender = .unspecified
-            }
-            return HoloVoice.Candidate(
-                identifier: voice.identifier,
-                name: voice.name,
-                language: voice.language,
-                reportedGender: gender,
-                quality: voice.quality.rawValue
-            )
+    /// Whether spoken launch will actually say anything, and why not if it
+    /// will not. Settings shows this rather than leaving unexplained silence.
+    var spokenLaunchUnavailableReason: String? { speech.unavailableReason }
+
+    private func play(_ phrase: SpokenPhrase) {
+        configureSessionIfNeeded()
+        guard phrase.duration > 0 else { return }
+        let data = PCMWaveWriter.wavData(samples: phrase.samples, sampleRate: phrase.sampleRate)
+        do {
+            let player = try AVAudioPlayer(data: data, fileTypeHint: AVFileType.wav.rawValue)
+            player.volume = 0.95
+            player.prepareToPlay()
+            speaking?.stop()
+            speaking = player
+            player.play()
+            // The microphone is told to look away for as long as this actually
+            // lasts, rather than for a guess, so the launcher's own voice can
+            // never be heard as a clap.
+            onOwnSound?(phrase.duration + 0.2)
+        } catch {
+            logger.error("announcement unplayable: \(error.localizedDescription, privacy: .public)")
         }
-        guard let choice = HoloVoice.best(from: candidates) else { return nil }
-        logger.info("speaking with \(choice.name, privacy: .public) (\(choice.language, privacy: .public))")
-        cachedVoice = AVSpeechSynthesisVoice(identifier: choice.identifier)
-        return cachedVoice
     }
 
     // MARK: - Setup
@@ -489,8 +456,11 @@ final class SystemSound: SoundPlaying {
 final class SystemSound: SoundPlaying {
     var onOwnSound: ((TimeInterval) -> Void)?
 
+    init(speech: NeuralSpeaking) {}
+
     func selectionTick() {}
-    func announceLaunch(of name: String) {}
+    func announceLaunch(of item: LauncherItem) {}
+    func prepareAnnouncements(for items: [LauncherItem]) async {}
     func cancelSpeech() {}
 }
 
@@ -506,9 +476,20 @@ final class SilentSound: SoundPlaying {
 
     private(set) var tickCount = 0
     private(set) var announcements: [String] = []
+    private(set) var preparedCounts: [Int] = []
     private(set) var cancelCount = 0
 
     func selectionTick() { tickCount += 1 }
-    func announceLaunch(of name: String) { announcements.append(name) }
+
+    func announceLaunch(of item: LauncherItem) {
+        guard SoundPreferences.spokenLaunchEnabled else { return }
+        guard let phrase = LaunchAnnouncement.phrase(for: item) else { return }
+        announcements.append(phrase)
+    }
+
+    func prepareAnnouncements(for items: [LauncherItem]) async {
+        preparedCounts.append(items.count)
+    }
+
     func cancelSpeech() { cancelCount += 1 }
 }

@@ -236,7 +236,7 @@ final class LauncherViewModelTests: XCTestCase {
 
         await harness.model.launchSelected()
 
-        XCTAssertEqual(harness.sound.announcements, ["Charlie"])
+        XCTAssertEqual(harness.sound.announcements, ["Opening Charlie"])
     }
 
     func testARefusedLaunchCutsTheAnnouncement() async {
@@ -247,7 +247,7 @@ final class LauncherViewModelTests: XCTestCase {
 
         // It said "Opening Charlie" and then nothing opened; leaving that
         // hanging over the recovery alert would be worse than silence.
-        XCTAssertEqual(harness.sound.announcements, ["Charlie"])
+        XCTAssertEqual(harness.sound.announcements, ["Opening Charlie"])
         XCTAssertEqual(harness.sound.cancelCount, 1)
     }
 

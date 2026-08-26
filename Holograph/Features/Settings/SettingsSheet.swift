@@ -13,6 +13,7 @@ struct SettingsSheet: View {
     @State private var editorTarget: EditorTarget?
     @AppStorage(AirGesturePreferences.enabledKey) private var airGesturesEnabled = false
     @AppStorage(ClapPreferences.enabledKey) private var clapToOpenEnabled = false
+    @AppStorage(HeadTrackingPreferences.enabledKey) private var headTrackingEnabled = false
     @AppStorage(SoundPreferences.effectsKey) private var soundEffectsEnabled = true
     @AppStorage(SoundPreferences.spokenLaunchKey) private var spokenLaunchEnabled = true
 
@@ -29,6 +30,7 @@ struct SettingsSheet: View {
                     librarySection(for: folder)
                 }
                 airGestureSection
+                headTrackingSection
                 clapSection
                 soundSection
                 maintenanceSection
@@ -279,12 +281,31 @@ struct SettingsSheet: View {
             .accessibilityIdentifier(AccessibilityID.airGestures)
             .onChange(of: airGesturesEnabled) { _, isOn in
                 guard isOn else { return }
-                Task { await confirmCameraAccess() }
+                Task { await confirmCameraAccess(for: .airGestures) }
             }
         } header: {
             Text("Air Gestures")
         } footer: {
-            Text("Flick a hand left or right in front of the screen, from a foot or two away, and the apps move the other way — as though you were pushing the wall along. There is a short pause afterwards so you can bring your hand back and set up the next one.\n\nFor a longer journey, put your fingertips together and sweep: the wall comes with you until you open your hand again.\n\nThe camera is used only while the launcher is open — nothing is recorded, and no video leaves the iPad.")
+            Text("Flick a hand left or right in front of the screen, from a foot or two away, and the wall follows your hand. There is a short pause afterwards so you can bring your hand back and set up the next one.\n\nFor a longer journey, put your fingertips together and sweep: the wall comes with you until you open your hand again.\n\nThe camera is used only while the launcher is open — nothing is recorded, and no video leaves the iPad.")
+        }
+    }
+
+    /// Off by default, like every camera feature here. It shares the camera
+    /// with air gestures rather than opening a second one.
+    private var headTrackingSection: some View {
+        Section {
+            Toggle(isOn: $headTrackingEnabled) {
+                Label("Head-Tracked 3D", systemImage: "cube.transparent")
+            }
+            .accessibilityIdentifier(AccessibilityID.headTracking)
+            .onChange(of: headTrackingEnabled) { _, isOn in
+                guard isOn else { return }
+                Task { await confirmCameraAccess(for: .headTracking) }
+            }
+        } header: {
+            Text("Depth")
+        } footer: {
+            Text("The launcher shifts perspective as you move, so the wall of tiles appears to hang in space behind the display rather than sit on it. The movement is deliberately small.\n\nHolograph estimates roughly where your head is and nothing else. It does not recognise faces, identify anyone, or store any picture of you: each frame is measured on this iPad and thrown away immediately, and no video ever leaves the device. Air gestures and this share one camera, so turning both on costs no more than either.")
         }
     }
 
@@ -324,18 +345,35 @@ struct SettingsSheet: View {
         #endif
     }
 
-    /// Asks for the camera the moment the switch is turned on, and turns it back
+    /// Which switch asked for the camera, so the explanation names the right
+    /// feature when the answer is no.
+    private enum CameraFeature {
+        case airGestures
+        case headTracking
+
+        var name: String {
+            switch self {
+            case .airGestures: return "Air gestures"
+            case .headTracking: return "Head-tracked 3D"
+            }
+        }
+    }
+
+    /// Asks for the camera the moment a switch is turned on, and turns it back
     /// off if the answer is no — a switch that claims to be on while nothing
     /// works is worse than one that refuses.
-    private func confirmCameraAccess() async {
+    private func confirmCameraAccess(for feature: CameraFeature) async {
         #if os(iOS)
-        guard await CameraAirGestureSource.requestAccess() else {
-            airGesturesEnabled = false
+        guard await HoloCameraSource.requestAccess() else {
+            switch feature {
+            case .airGestures: airGesturesEnabled = false
+            case .headTracking: headTrackingEnabled = false
+            }
             model.alert = LauncherAlert(
                 title: "Camera access is off",
-                message: CameraAirGestureSource.isAccessDenied
-                    ? "Air gestures need the camera. Turn it on for Holograph in the Settings app, under Privacy & Security → Camera."
-                    : "Air gestures need the camera, and permission was not granted."
+                message: HoloCameraSource.isAccessDenied
+                    ? "\(feature.name) needs the camera. Turn it on for Holograph in the Settings app, under Privacy & Security → Camera."
+                    : "\(feature.name) needs the camera, and permission was not granted."
             )
             return
         }
@@ -358,7 +396,7 @@ struct SettingsSheet: View {
         } header: {
             Text("Sound")
         } footer: {
-            Text("A tick as the carousel moves, and “Opening…” spoken as an app launches. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing.\n\nFor the voice, download Daniel (Enhanced or Premium) under Settings → Accessibility → Spoken Content → Voices → English (UK). Holograph picks the best one installed, and the enhanced recording is markedly less synthetic.")
+            Text("A tick as the carousel moves, and “Opening…” spoken as an app or website opens. Both play even when the iPad is on silent — turn them off here instead — and neither interrupts what you are already playing. Folders open silently: they are not going anywhere.\n\nThe voice is a neural one that runs entirely on this iPad. Nothing is sent anywhere, no account or connection is involved, and no system voice needs installing.")
         }
     }
 

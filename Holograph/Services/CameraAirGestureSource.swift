@@ -3,385 +3,110 @@ import OSLog
 
 #if canImport(AVFoundation) && canImport(Vision) && os(iOS)
 import AVFoundation
-import Vision
 
-/// Watches the front camera for a hand flicked left or right in front of the
-/// screen, using Vision's hand-pose model.
+/// Air gestures, on top of the shared front-camera session.
 ///
 /// Why this way. Nothing on an iPad reports a hand waving a foot or two away —
 /// there is no proximity or depth API for it — and ARKit body tracking is far
 /// heavier than the question deserves. `VNDetectHumanHandPoseRequest` returns 21
 /// landmarks per hand from an ordinary camera frame, and at one to two feet the
-/// hand fills enough of the frame that a 640×480 feed tracks it comfortably. The
-/// gesture needs exactly one number — where the hand sits across the frame — so
-/// the feed is kept deliberately small and slow: VGA at roughly 18 readings a
-/// second, late frames discarded.
+/// hand fills enough of the frame that a VGA feed tracks it comfortably.
 ///
-/// Nothing is recorded. Frames are analysed and thrown away; the only thing that
-/// leaves this object is a direction.
+/// The capture session itself lives in `HoloCameraSource`, because head-tracked
+/// depth wants the same frames and two sessions would be twice the power for
+/// the same pictures. This type is the part that is only about gestures:
+/// attaching, detaching, and asking for permission.
 @MainActor
 final class CameraAirGestureSource: AirGestureObserving {
     var onGesture: ((AirGesture) -> Void)?
     private(set) var isWatching = false
 
-    private let engine: CaptureEngine
-    private let logger = Logger(subsystem: "com.idlery.holograph", category: "airgesture")
+    private let camera: HoloCameraSource
 
-    init() {
-        let relay = GestureRelay()
-        engine = CaptureEngine(onGesture: { [relay] gesture in relay.deliver(gesture) })
-        relay.handler = { [weak self] gesture in self?.onGesture?(gesture) }
+    init(camera: HoloCameraSource = .shared) {
+        self.camera = camera
     }
 
     func start() {
         guard !isWatching else { return }
-        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-            logger.info("air gestures started without camera permission; staying off")
-            return
-        }
         isWatching = true
-        engine.start()
+        camera.onGesture = { [weak self] gesture in self?.onGesture?(gesture) }
+        camera.start(.gestures)
     }
 
     func stop() {
         guard isWatching else { return }
         isWatching = false
-        engine.stop()
+        camera.stop(.gestures)
     }
 
     // MARK: - Permission
 
-    /// Asks for camera access, reporting whether it was granted.
     static func requestAccess() async -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            return true
-        case .notDetermined:
-            return await AVCaptureDevice.requestAccess(for: .video)
-        default:
-            return false
-        }
+        await HoloCameraSource.requestAccess()
     }
 
-    /// `true` when the answer is no and only the Settings app can change it.
-    static var isAccessDenied: Bool {
-        let status = AVCaptureDevice.authorizationStatus(for: .video)
-        return status == .denied || status == .restricted
-    }
+    static var isAccessDenied: Bool { HoloCameraSource.isAccessDenied }
 }
 
-// MARK: - Delivery
-
-/// Carries a gesture from the capture queue back to the main actor.
+/// Head-tracked depth, on top of the same session.
 ///
-/// `@unchecked Sendable` because `handler` is written once during `init`, before
-/// the session that could call it has been started.
-private final class GestureRelay: @unchecked Sendable {
-    var handler: (@MainActor (AirGesture) -> Void)?
+/// A face bounding box is all this needs: where somebody is sitting, not who
+/// they are. Nothing is recognised, matched, embedded or stored.
+@MainActor
+final class CameraHeadTrackingSource: HeadTracking {
+    var onPerspective: ((HeadPerspective) -> Void)?
+    private(set) var isWatching = false
 
-    func deliver(_ gesture: AirGesture) {
-        Task { @MainActor in self.handler?(gesture) }
-    }
-}
+    private let camera: HoloCameraSource
 
-// MARK: - Capture
-
-/// Owns the capture session and everything that runs off the main actor.
-///
-/// `@unchecked Sendable` because every mutable member is confined to `queue`,
-/// which is both the configuration queue and the one AVFoundation delivers
-/// sample buffers on — a constraint the compiler cannot see but the code keeps.
-private final class CaptureEngine: @unchecked Sendable {
-    private let session = AVCaptureSession()
-    private let output = AVCaptureVideoDataOutput()
-    private let queue = DispatchQueue(label: "com.idlery.holograph.airgesture")
-    private let processor: FrameProcessor
-    private let logger = Logger(subsystem: "com.idlery.holograph", category: "airgesture")
-
-    private var isConfigured = false
-    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var rotationObservation: NSKeyValueObservation?
-
-    init(onGesture: @escaping @Sendable (AirGesture) -> Void) {
-        processor = FrameProcessor()
-        processor.onGesture = onGesture
+    init(camera: HoloCameraSource = .shared) {
+        self.camera = camera
     }
 
     func start() {
-        queue.async { [self] in
-            guard configure() else { return }
-            if !session.isRunning { session.startRunning() }
-        }
+        guard !isWatching else { return }
+        isWatching = true
+        camera.onPerspective = { [weak self] perspective in self?.onPerspective?(perspective) }
+        camera.start(.head)
     }
 
     func stop() {
-        queue.async { [self] in
-            if session.isRunning { session.stopRunning() }
-            processor.reset()
-        }
+        guard isWatching else { return }
+        isWatching = false
+        camera.stop(.head)
+        // The scene must not be left leaning wherever the last frame put it.
+        onPerspective?(.neutral)
     }
 
-    /// Builds the session once. Returns whether it is usable.
-    private func configure() -> Bool {
-        if isConfigured { return true }
-
-        session.beginConfiguration()
-        defer { session.commitConfiguration() }
-
-        // VGA is ample for a hand at arm's length and keeps Vision cheap.
-        if session.canSetSessionPreset(.vga640x480) {
-            session.sessionPreset = .vga640x480
-        }
-
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else {
-            logger.error("no usable front camera for air gestures")
-            return false
-        }
-        session.addInput(input)
-
-        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        output.alwaysDiscardsLateVideoFrames = true
-        output.setSampleBufferDelegate(processor, queue: queue)
-        guard session.canAddOutput(output) else {
-            logger.error("could not attach the video output for air gestures")
-            return false
-        }
-        session.addOutput(output)
-
-        if let connection = output.connection(with: .video) {
-            // Mirrored, so the frame matches what the user sees of themselves:
-            // move a hand to your right and it moves right in the image. Without
-            // this the front camera records the view from where the camera
-            // stands, which has left and right the other way round.
-            if connection.isVideoMirroringSupported {
-                connection.automaticallyAdjustsVideoMirroring = false
-                connection.isVideoMirrored = true
-            }
-
-            // Upright, and kept upright as the iPad turns — otherwise the axis a
-            // horizontal flick moves along changes with the orientation.
-            let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
-            rotationCoordinator = coordinator
-            rotationObservation = coordinator.observe(
-                \.videoRotationAngleForHorizonLevelCapture,
-                options: [.initial, .new]
-            ) { [weak self] _, change in
-                guard let self, let angle = change.newValue else { return }
-                queue.async { self.applyRotation(angle) }
-            }
-        }
-
-        isConfigured = true
-        return true
+    static func requestAccess() async -> Bool {
+        await HoloCameraSource.requestAccess()
     }
 
-    private func applyRotation(_ angle: CGFloat) {
-        guard let connection = output.connection(with: .video),
-              connection.isVideoRotationAngleSupported(angle) else { return }
-        connection.videoRotationAngle = angle
-        // The frame's axes just moved; a path measured across the old ones is
-        // not a gesture.
-        processor.reset()
-    }
+    static var isAccessDenied: Bool { HoloCameraSource.isAccessDenied }
 }
 
-// MARK: - Frames
+#else
 
-/// Runs Vision on the capture queue and keeps the detector fed.
-///
-/// `@unchecked Sendable` for the same reason as the engine: all of its mutable
-/// state belongs to the capture queue. Nothing here touches the main actor —
-/// `onSwipe` hops for itself.
-private final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
-    var onGesture: (@Sendable (AirGesture) -> Void)?
+/// Non-iOS builds get sources that watch nothing rather than a build error.
+@MainActor
+final class CameraAirGestureSource: AirGestureObserving {
+    var onGesture: ((AirGesture) -> Void)?
+    private(set) var isWatching = false
+    func start() { isWatching = true }
+    func stop() { isWatching = false }
+    static func requestAccess() async -> Bool { false }
+    static var isAccessDenied: Bool { true }
+}
 
-    private var detector = AirGestureDetector()
-    private let request = VNDetectHumanHandPoseRequest()
-    private var lastAnalysis: TimeInterval = -.greatestFiniteMagnitude
-    private var lastHandSeen: TimeInterval = -.greatestFiniteMagnitude
-    /// A hand does not change width, so the last measured span stands in when
-    /// the current frame is too blurred to measure one.
-    private var lastSpan: Double?
-
-    /// Thirty readings a second rather than eighteen.
-    ///
-    /// A flick lasts about three tenths of a second, and every reading lost to
-    /// motion blur is a fifth of the evidence gone at eighteen. Sampling faster
-    /// is worth far more than loosening what counts as a flick: measured
-    /// against a model of the blur, it lifts a short flick from a two-in-three
-    /// chance of registering to nine in ten, and unlike a looser threshold it
-    /// costs nothing in false ones.
-    private let analysisInterval: TimeInterval = 1.0 / 30.0
-    /// Low, deliberately. A hand mid-flick is smeared across the frame and
-    /// Vision is not confident about any part of it — which is exactly the
-    /// moment the reading matters. Position comes from the average of several
-    /// knuckles, so a middling landmark moves it very little, while discarding
-    /// the frame outright loses the flick.
-    private let minimumConfidence: Float = 0.35
-    /// How long a hand may be unreadable before it counts as gone. Long enough
-    /// to cover a whole blurred flick; the detector has its own, shorter, view
-    /// of what gap is too long to carry a movement across.
-    private let handGoneAfter: TimeInterval = 0.5
-
-    override init() {
-        request.maximumHandCount = 1
-        super.init()
-    }
-
-    func reset() {
-        detector.handLost()
-        lastHandSeen = -.greatestFiniteMagnitude
-        lastSpan = nil
-    }
-
-    func captureOutput(
-        _ output: AVCaptureOutput,
-        didOutput sampleBuffer: CMSampleBuffer,
-        from connection: AVCaptureConnection
-    ) {
-        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
-        guard timestamp.isFinite else { return }
-        guard timestamp - lastAnalysis >= analysisInterval else { return }
-        lastAnalysis = timestamp
-
-        // Vision reports positions normalised to the frame, so a square distance
-        // needs the frame's own proportions to come back out.
-        guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let width = Double(CVPixelBufferGetWidth(pixels))
-        let height = Double(CVPixelBufferGetHeight(pixels))
-        guard height > 0 else { return }
-        let aspect = width / height
-
-        // The connection already delivers the frame upright and mirrored, so
-        // Vision needs no further orientation.
-        let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
-        do {
-            try handler.perform([request])
-        } catch {
-            return
-        }
-
-        guard let observation = request.results?.first,
-              let reading = Self.reading(
-                  from: observation,
-                  aspect: aspect,
-                  minimumConfidence: minimumConfidence,
-                  fallbackSpan: lastSpan
-              )
-        else {
-            if timestamp - lastHandSeen >= handGoneAfter {
-                detector.handLost()
-                lastSpan = nil
-            }
-            return
-        }
-
-        lastHandSeen = timestamp
-        lastSpan = reading.span
-        if let gesture = detector.handSeen(reading, time: timestamp) {
-            onGesture?(gesture)
-        }
-    }
-
-    /// Reduces a hand to what the detector needs, measured against the hand's
-    /// own size so distance from the camera drops out.
-    ///
-    /// Position comes from the wrist and knuckles, never a fingertip: knuckles
-    /// stay put while fingers curl, so it follows the hand rather than whatever
-    /// shape the fingers are making. The knuckle span is the ruler — the one
-    /// measurement on a hand that barely changes as the fingers move.
-    ///
-    /// Fingertips are read separately and allowed to fail. A hand mid-flick is
-    /// motion-blurred and its fingertips are the first landmarks to drop below
-    /// confidence; insisting on them would discard the whole reading exactly
-    /// when a swipe is happening, which is precisely how swipes stopped
-    /// registering.
-    static func reading(
-        from observation: VNHumanHandPoseObservation,
-        aspect: Double,
-        minimumConfidence: Float,
-        fallbackSpan: Double? = nil
-    ) -> HandReading? {
-        func point(
-            _ joint: VNHumanHandPoseObservation.JointName,
-            confidence: Float = minimumConfidence
-        ) -> CGPoint? {
-            guard let found = try? observation.recognizedPoint(joint),
-                  found.confidence >= confidence else { return nil }
-            // Stretch x by the aspect ratio so both axes are in the same units.
-            return CGPoint(x: found.location.x * aspect, y: found.location.y)
-        }
-
-        let knuckleJoints: [VNHumanHandPoseObservation.JointName] =
-            [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
-        let knuckles = knuckleJoints.compactMap { point($0) }
-        // One landmark is not a hand; it is a knuckle-shaped false positive.
-        guard knuckles.count >= 2 else { return nil }
-
-        // A hand's width is the one thing about it that does not change, so a
-        // frame too smeared to measure one borrows the last. Losing the ruler
-        // used to lose the whole reading, mid-flick, every time.
-        guard let span = span(from: observation, point: point) ?? fallbackSpan else { return nil }
-        let centreX = knuckles.map(\.x).reduce(0, +) / Double(knuckles.count)
-
-        // x and span travel separately. Dividing here would fold the noise in
-        // the scale estimate into the position, which is most of a flick's worth
-        // of phantom movement on a hand that is not moving at all.
-        return HandReading(
-            x: centreX,
-            span: span,
-            spread: spread(from: observation, span: span, point: point)
-        )
-    }
-
-    /// The hand's width, in the frame's own units.
-    ///
-    /// Across the knuckles when both edges are visible; from the wrist to the
-    /// middle knuckle otherwise, which is about a fifth longer than the hand is
-    /// wide. Having a fallback matters: losing the ruler loses the reading.
-    private static func span(
-        from observation: VNHumanHandPoseObservation,
-        point: (VNHumanHandPoseObservation.JointName, Float) -> CGPoint?
-    ) -> Double? {
-        var measured: Double?
-        if let index = point(.indexMCP, 0.3), let little = point(.littleMCP, 0.3) {
-            measured = hypot(index.x - little.x, index.y - little.y)
-        } else if let wrist = point(.wrist, 0.3), let middle = point(.middleMCP, 0.3) {
-            measured = hypot(wrist.x - middle.x, wrist.y - middle.y) / 1.2
-        }
-        // A hand seen edge-on has almost no span, and dividing by it would turn
-        // a twitch into a swipe.
-        guard let measured, measured > 0.02 else { return nil }
-        return measured
-    }
-
-    /// How far the fingertips sit from their own centre, in spans, or `nil` when
-    /// too few of them can be seen to tell an open hand from a closed one.
-    ///
-    /// The confidence bar is lower here than for the knuckles on purpose:
-    /// gathered fingertips overlap one another, which is exactly the pose the
-    /// burst has to recognise and the one Vision is least sure about.
-    private static func spread(
-        from observation: VNHumanHandPoseObservation,
-        span: Double,
-        point: (VNHumanHandPoseObservation.JointName, Float) -> CGPoint?
-    ) -> Double? {
-        let tipJoints: [VNHumanHandPoseObservation.JointName] =
-            [.thumbTip, .indexTip, .middleTip, .ringTip, .littleTip]
-        let tips = tipJoints.compactMap { point($0, 0.4) }
-        guard tips.count >= 3 else { return nil }
-
-        let centre = CGPoint(
-            x: tips.map(\.x).reduce(0, +) / Double(tips.count),
-            y: tips.map(\.y).reduce(0, +) / Double(tips.count)
-        )
-        let mean = tips
-            .map { hypot($0.x - centre.x, $0.y - centre.y) }
-            .reduce(0, +) / Double(tips.count)
-        return mean / span
-    }
+@MainActor
+final class CameraHeadTrackingSource: HeadTracking {
+    var onPerspective: ((HeadPerspective) -> Void)?
+    private(set) var isWatching = false
+    func start() { isWatching = true }
+    func stop() { isWatching = false }
+    static func requestAccess() async -> Bool { false }
+    static var isAccessDenied: Bool { true }
 }
 
 #endif

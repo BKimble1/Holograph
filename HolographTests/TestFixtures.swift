@@ -13,6 +13,7 @@ enum TestFixtures {
         isDemo: Bool = false
     ) -> LauncherItemDraft {
         LauncherItemDraft(
+            kind: .app,
             name: name,
             launchURL: URL(string: "\(scheme)://launch") ?? placeholderURL,
             fallbackURL: fallback.flatMap(URL.init(string:)),
@@ -97,5 +98,40 @@ struct StubMetadataProvider: AppStoreMetadataProviding {
     func artworkData(at url: URL) async throws -> Data {
         guard let artwork else { throw AppStoreLookupError.artworkUnavailable }
         return artwork
+    }
+}
+
+
+/// The view model, wired to stubs, for the suites that exercise behaviour
+/// rather than storage.
+///
+/// Shared rather than rebuilt in each file: several suites now need the same
+/// arrangement, and three copies of it would drift.
+@MainActor
+final class LauncherHarness {
+    let model: LauncherViewModel
+    let repository: InMemoryLauncherRepository
+    let launcher: StubAppLauncher
+    let feedback: SilentFeedback
+    let sound: SilentSound
+    let selectionStore: InMemorySelectionStore
+    let motion: HoloMotion
+
+    init(items: [LauncherItem] = [], launchSucceeds: Bool = true) {
+        repository = InMemoryLauncherRepository(items: items)
+        launcher = StubAppLauncher(outcome: launchSucceeds)
+        feedback = SilentFeedback()
+        sound = SilentSound()
+        selectionStore = InMemorySelectionStore()
+        // Testing mode collapses the launch ceremony to a single millisecond.
+        motion = HoloMotion(isDisabledForTesting: true)
+        model = LauncherViewModel(
+            repository: repository,
+            launcher: launcher,
+            feedback: feedback,
+            sound: sound,
+            selectionStore: selectionStore,
+            motion: motion
+        )
     }
 }

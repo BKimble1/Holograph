@@ -153,6 +153,17 @@ final class LauncherViewModel {
         }
         items = visibleScope
         restoreSelectionIfPossible()
+        prepareAnnouncements()
+    }
+
+    /// Warms the voice and renders the library's launch phrases in the
+    /// background, so the first app opened after launch is as quick as the
+    /// tenth. Nothing waits for this, and nothing breaks if it never finishes.
+    private func prepareAnnouncements() {
+        let items = allItems
+        Task { [sound] in
+            await sound.prepareAnnouncements(for: items)
+        }
     }
 
     private func restoreSelectionIfPossible() {
@@ -252,7 +263,7 @@ final class LauncherViewModel {
 
     /// Opens a folder over the wall. The wall keeps its own selection so
     /// closing puts the user back exactly where they were.
-    func openFolder(_ id: UUID) {
+    func enterFolder(_ id: UUID) {
         guard let folder = allItems.first(where: { $0.id == id && $0.isFolder }) else { return }
         guard openFolderID == nil else { return }
         rootSelectionBeforeFolder = selectedID
@@ -286,7 +297,7 @@ final class LauncherViewModel {
             // A folder stays inside Holograph, so it gets the tick rather than
             // the launch ceremony and the announcement.
             feedback.selectionChanged()
-            withAnimation(motion.transition) { openFolder(id) }
+            withAnimation(motion.transition) { enterFolder(id) }
         case .openInHolograph(let url):
             await presentInHolograph(item, url: url)
         case .openExternally:
@@ -301,7 +312,7 @@ final class LauncherViewModel {
     private func presentInHolograph(_ item: LauncherItem, url: URL) async {
         isLaunching = true
         feedback.launchImpact()
-        sound.announceLaunch(of: item.name)
+        sound.announceLaunch(of: item)
         await runPortalCeremony()
         finishCeremony()
         isLaunching = false
@@ -313,7 +324,7 @@ final class LauncherViewModel {
         feedback.launchImpact()
         // Spoken as the portal opens rather than after it: the ceremony and the
         // announcement are the same beat.
-        sound.announceLaunch(of: item.name)
+        sound.announceLaunch(of: item)
         await runPortalCeremony()
 
         let outcome = await coordinator.launch(item)
@@ -388,6 +399,9 @@ final class LauncherViewModel {
         perform("Couldn’t save your changes") {
             try repository.update(id: id, with: draft)
             reloadPreservingSelection()
+            // A rename changes what is said about a tile, so its announcement
+            // has to be rendered again.
+            prepareAnnouncements()
         }
     }
 

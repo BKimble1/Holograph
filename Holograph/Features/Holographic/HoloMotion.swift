@@ -19,6 +19,11 @@ final class HoloMotion {
     var holdsLoadingScreen = false
     /// Keeps the intro up indefinitely, for the one test that photographs it.
     var freezesLoadingScreen = false
+    /// Where the viewer is, when head tracking is running. Lives here rather
+    /// than in a view's `@State` because the camera's callback outlives any
+    /// particular view struct, and a service holding a stale copy of a view is
+    /// exactly the bug that pattern invites.
+    var headPerspective: HeadPerspective = .neutral
 
     init(
         isDisabledForTesting: Bool = false,
@@ -40,6 +45,20 @@ final class HoloMotion {
 
     /// Whether depth, tilt and parallax should be applied while scrolling.
     var appliesDepthEffects: Bool { !prefersReducedMotion }
+
+    /// How much of the head-tracked perspective to apply, 0…1.
+    ///
+    /// Reduce Motion does not switch it off outright — a window that responds
+    /// to where you are sitting is the point of the feature, and losing it
+    /// entirely is a worse answer than losing most of it. What it does is take
+    /// the movement down to a quarter, which keeps the sense of depth while
+    /// putting the actual travel well inside what Reduce Motion is asking for.
+    /// Under test it is off completely, so screenshots do not depend on a face.
+    var headParallaxScale: Double {
+        if isDisabledForTesting { return 0 }
+        if prefersReducedMotion { return 0.25 }
+        return 1
+    }
 
     /// The animation to use for discrete state changes such as selection.
     var transition: Animation {

@@ -38,6 +38,7 @@ final class PreviewHarness {
             feedback: feedback,
             sound: sound,
             airGestures: InertAirGestureSource(),
+            headTracking: InertHeadTrackingSource(),
             claps: InertClapListener(),
             selectionStore: selectionStore,
             metadataProvider: PreviewMetadataProvider()

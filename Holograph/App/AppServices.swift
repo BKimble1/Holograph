@@ -14,6 +14,7 @@ final class AppServices {
     let feedback: FeedbackProviding
     let sound: SoundPlaying
     let airGestures: AirGestureObserving
+    let headTracking: HeadTracking
     let claps: ClapListening
     let selectionStore: SelectionStoring
     let iconProcessor: IconProcessor
@@ -25,6 +26,7 @@ final class AppServices {
         feedback: FeedbackProviding,
         sound: SoundPlaying,
         airGestures: AirGestureObserving,
+        headTracking: HeadTracking,
         claps: ClapListening,
         selectionStore: SelectionStoring,
         iconProcessor: IconProcessor = IconProcessor(),
@@ -35,6 +37,7 @@ final class AppServices {
         self.feedback = feedback
         self.sound = sound
         self.airGestures = airGestures
+        self.headTracking = headTracking
         self.claps = claps
         self.selectionStore = selectionStore
         self.iconProcessor = iconProcessor
@@ -96,16 +99,24 @@ struct AppComposition {
         // Tests get stubs: there is no camera and no room in the simulator, and
         // a UI test must not depend on either.
         let airGestures: AirGestureObserving
+        let headTracking: HeadTracking
         let claps: ClapListening
         #if os(iOS)
+        // Both camera features attach to the same session; see HoloCameraSource.
         airGestures = staysQuiet ? InertAirGestureSource() : CameraAirGestureSource()
+        headTracking = staysQuiet ? InertHeadTrackingSource() : CameraHeadTrackingSource()
         claps = staysQuiet ? InertClapListener() : MicrophoneClapSource()
         #else
         airGestures = InertAirGestureSource()
+        headTracking = InertHeadTrackingSource()
         claps = InertClapListener()
         #endif
 
-        let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
+        // The launch voice is a local neural model. Tests never load it: the
+        // weights are larger than the rest of the app, and a unit suite that
+        // waits for Core ML is a unit suite nobody runs.
+        let speech: NeuralSpeaking = staysQuiet ? StubNeuralSpeech() : KokoroSpeechEngine()
+        let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound(speech: speech)
         // The launcher's own tick and its voice come out of the same speaker the
         // microphone is pointed at, and two ticks in a second read as a perfectly
         // good double clap. Whenever it makes a noise, the listener looks away.
@@ -122,6 +133,7 @@ struct AppComposition {
             feedback: feedback,
             sound: sound,
             airGestures: airGestures,
+            headTracking: headTracking,
             claps: claps,
             selectionStore: selectionStore
         )
