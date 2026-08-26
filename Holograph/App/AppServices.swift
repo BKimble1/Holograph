@@ -105,7 +105,7 @@ struct AppComposition {
         claps = InertClapListener()
         #endif
 
-        var sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
+        let sound: SoundPlaying = staysQuiet ? SilentSound() : SystemSound()
         // The launcher's own tick and its voice come out of the same speaker the
         // microphone is pointed at, and two ticks in a second read as a perfectly
         // good double clap. Whenever it makes a noise, the listener looks away.

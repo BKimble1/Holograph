@@ -98,9 +98,12 @@ enum HoloAudioSession {
             // interrupting anything already playing, and `.defaultToSpeaker`
             // keeps them out of the earpiece once recording is in the mix.
             if wantsInput {
+                // No Bluetooth: routing the microphone to a headset would put
+                // both the tick and the room down a mono voice channel, and the
+                // built-in microphone is the one pointed at whoever is clapping.
                 try session.setCategory(
                     .playAndRecord, mode: .default,
-                    options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]
+                    options: [.mixWithOthers, .defaultToSpeaker]
                 )
             } else {
                 try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
@@ -401,7 +404,9 @@ final class SystemSound: SoundPlaying {
     /// Roughly how long a phrase takes at the rate above. Only ever used to
     /// decide how long to stop listening for, so approximate is enough — and
     /// erring long is the safe direction.
-    static func spokenDuration(of phrase: String) -> TimeInterval {
+    ///
+    /// Arithmetic on a string, so it belongs to nobody in particular.
+    nonisolated static func spokenDuration(of phrase: String) -> TimeInterval {
         min(6, 1.2 + Double(phrase.count) * 0.075)
     }
 
