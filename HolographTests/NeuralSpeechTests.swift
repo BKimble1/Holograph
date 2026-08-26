@@ -177,7 +177,8 @@ final class NeuralSpeechEngineTests: XCTestCase {
 
     func testAnUnavailableEngineRendersNothing() async {
         let speech = StubNeuralSpeech(isReady: false, unavailableReason: "not installed")
-        XCTAssertNil(await speech.render("Opening Mail"))
+        let rendered = await speech.render("Opening Mail")
+        XCTAssertNil(rendered)
     }
 }
 
