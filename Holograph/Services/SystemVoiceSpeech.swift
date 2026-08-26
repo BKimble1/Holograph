@@ -16,8 +16,8 @@ struct SystemVoiceDescriptor: Equatable, Sendable {
     let name: String
     /// BCP-47, e.g. `en-GB`.
     let language: String
-    /// 0 compact, 1 enhanced, 2 premium — the order `AVSpeechSynthesisVoiceQuality`
-    /// happens to use, and the order that matters.
+    /// `AVSpeechSynthesisVoiceQuality.rawValue` — default, enhanced, premium,
+    /// ascending. Only the ordering is relied on, never the numbers.
     let quality: Int
     let isMale: Bool
 }
@@ -147,7 +147,7 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
             utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
         }
 
-        return await withCheckedContinuation { continuation in
+        let rendered: SpokenPhrase? = await withCheckedContinuation { continuation in
             let collector = BufferCollector { continuation.resume(returning: $0) }
 
             // `write` calls back on an arbitrary queue, and calls back a final
@@ -169,6 +169,19 @@ final class SystemVoiceSpeechEngine: NeuralSpeaking {
                 collector.finish()
             }
         }
+        noteIfSilent(rendered, for: trimmed)
+        return rendered
+    }
+
+    /// Leaves a line in the log when a voice that should have spoken did not.
+    ///
+    /// Offline rendering is supported by every voice `speechVoices()` returns,
+    /// so an empty result is worth knowing about rather than shrugging at —
+    /// and the phrase's length rather than its text, because what a user named
+    /// their tiles is not something to write to a log.
+    private func noteIfSilent(_ rendered: SpokenPhrase?, for phrase: String) {
+        guard rendered == nil else { return }
+        logger.error("system voice rendered nothing for a phrase of \(phrase.count) characters")
     }
 
     /// How long a phrase gets to render before the attempt is abandoned.
