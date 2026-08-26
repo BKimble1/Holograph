@@ -38,6 +38,38 @@ enum LaunchOutcome: Equatable, Sendable {
     case failed(canOfferFallback: Bool)
 }
 
+/// What activating a tile should do.
+///
+/// A pure function of the item, kept apart from the machinery that carries it
+/// out so the routing itself can be tested without a launcher, a web view or a
+/// running app.
+enum LauncherActivation: Equatable, Sendable {
+    /// Hand the URL to iPadOS and leave.
+    case openExternally(URL)
+    /// Open it inside Holograph's own browser, and stay.
+    case openInHolograph(URL)
+    /// Open the folder over the wall, and stay.
+    case openFolder(UUID)
+    /// A record with nothing usable behind it — a launch link that stopped
+    /// parsing, say. Nothing happens, and the caller says so.
+    case unavailable
+}
+
+extension LauncherItem {
+    var activation: LauncherActivation {
+        switch kind {
+        case .folder:
+            return .openFolder(id)
+        case .app:
+            guard let launchURL else { return .unavailable }
+            return .openExternally(launchURL)
+        case .website:
+            guard let launchURL else { return .unavailable }
+            return .openInHolograph(launchURL)
+        }
+    }
+}
+
 /// Owns the "try primary, offer fallback" policy so the view model stays thin
 /// and the behaviour is unit-testable.
 @MainActor
@@ -45,8 +77,11 @@ struct LaunchCoordinator {
     let launcher: AppLaunching
 
     func launch(_ item: LauncherItem) async -> LaunchOutcome {
-        if await launcher.open(item.launchURL) {
-            return .opened(item.launchURL)
+        guard let launchURL = item.launchURL else {
+            return .failed(canOfferFallback: item.fallbackURL != nil)
+        }
+        if await launcher.open(launchURL) {
+            return .opened(launchURL)
         }
         return .failed(canOfferFallback: item.fallbackURL != nil)
     }

@@ -23,11 +23,15 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                appsSection
+                addSection
+                librarySection(for: nil)
+                ForEach(model.allItems.folders) { folder in
+                    librarySection(for: folder)
+                }
                 airGestureSection
                 clapSection
                 soundSection
-                librarySection
+                maintenanceSection
                 aboutSection
             }
             .scrollContentBackground(.hidden)
@@ -44,7 +48,7 @@ struct SettingsSheet: View {
                 }
             }
             .navigationDestination(item: $editorTarget) { target in
-                AppEditorView(target: target, services: services)
+                AppEditorView(target: target, services: services, folders: model.allItems.folders)
             }
         }
         .tint(HoloTheme.cyanBright)
@@ -67,13 +71,13 @@ struct SettingsSheet: View {
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         } message: { item in
-            Text("\(item.name) will be removed from your launcher. The app itself stays installed.")
+            Text(deleteMessage(for: item))
         }
-        .alert("Remove all apps?", isPresented: $isConfirmingRemoveAll) {
+        .alert("Remove everything?", isPresented: $isConfirmingRemoveAll) {
             Button("Remove All", role: .destructive) { model.removeAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every app you have added will be removed from the launcher. Nothing is uninstalled from your iPad.")
+            Text("Everything you have added — apps, websites and folders — will be removed from the launcher. Nothing is uninstalled from your iPad.")
         }
         .alert(
             testLaunchResult?.title ?? "",
@@ -91,35 +95,61 @@ struct SettingsSheet: View {
 
     // MARK: - Sections
 
-    @ViewBuilder
-    private var appsSection: some View {
+    /// The two things a user can add. Kept together and at the top, because
+    /// "where do I put a new thing" should not be a hunt.
+    private var addSection: some View {
         Section {
-            if model.items.isEmpty {
-                Text("No apps yet. Add one to fill the launcher.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(model.items) { item in
-                    row(for: item)
-                }
-                .onMove { source, destination in
-                    model.move(fromOffsets: source, toOffset: destination)
-                }
-                .onDelete { offsets in
-                    guard let index = offsets.first, model.items.indices.contains(index) else { return }
-                    pendingDelete = model.items[index]
-                }
-            }
-
             Button {
                 editorTarget = .add
             } label: {
-                Label("Add App", systemImage: "plus.circle.fill")
+                Label("Add App or Website", systemImage: "plus.circle.fill")
             }
             .accessibilityIdentifier(AccessibilityID.addApp)
+
+            Button {
+                editorTarget = .addFolder
+            } label: {
+                Label("Create Folder", systemImage: "folder.badge.plus")
+            }
+            .accessibilityIdentifier(AccessibilityID.addFolder)
         } header: {
-            Text("Your Apps")
+            Text("Add")
+        }
+    }
+
+    /// One section per scope: the wall itself, then each folder. Ordering is
+    /// per section because that is exactly how the launcher orders them —
+    /// dragging inside a folder must not disturb the wall.
+    @ViewBuilder
+    private func librarySection(for folder: LauncherItem?) -> some View {
+        let contents = folder.map { model.children(of: $0.id) } ?? model.allItems.rootItems
+
+        Section {
+            if contents.isEmpty {
+                Text(folder == nil
+                     ? "Nothing here yet. Add an app or a website to fill the launcher."
+                     : "This folder is empty. Use an item’s menu to move it in here.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(contents) { item in
+                    row(for: item)
+                }
+                .onMove { source, destination in
+                    model.move(fromOffsets: source, toOffset: destination, in: folder?.id)
+                }
+                .onDelete { offsets in
+                    guard let index = offsets.first, contents.indices.contains(index) else { return }
+                    pendingDelete = contents[index]
+                }
+            }
+        } header: {
+            Text(folder?.name ?? "Main Launcher")
         } footer: {
-            Text("Drag to reorder, or use each app’s menu. The order here is the order on the launcher.")
+            if folder == nil {
+                Text("Drag to reorder, or use each item’s menu. The order here is the order on the launcher.")
+            } else {
+                Text("Deleting this folder puts everything in it back on the main launcher — nothing inside is lost.")
+            }
         }
     }
 
@@ -135,17 +165,10 @@ struct SettingsSheet: View {
                 HStack(spacing: 6) {
                     Text(item.name)
                         .font(.body)
-                    if item.isDemo {
-                        Text("DEMO")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .tracking(0.8)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(HoloTheme.cyan.opacity(0.22), in: Capsule())
-                            .foregroundStyle(HoloTheme.cyanBright)
-                    }
+                    badge(item.kind.noun.uppercased())
+                    if item.isDemo { badge("DEMO") }
                 }
-                Text(item.launchURL.absoluteString)
+                Text(item.subtitle(folderCount: model.itemCount(inFolder: item.id)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -164,24 +187,54 @@ struct SettingsSheet: View {
         }
     }
 
+    private func badge(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .tracking(0.8)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(HoloTheme.cyan.opacity(0.22), in: Capsule())
+            .foregroundStyle(HoloTheme.cyanBright)
+    }
+
     private func rowMenu(for item: LauncherItem) -> some View {
         Menu {
             Button {
                 editorTarget = .edit(item)
             } label: {
-                Label("Edit App", systemImage: "square.and.pencil")
+                Label(item.isFolder ? "Edit Folder" : "Edit", systemImage: "square.and.pencil")
             }
             .accessibilityIdentifier(AccessibilityID.appRowEdit(item.name))
 
-            Button {
-                Task { await testLaunch(item) }
-            } label: {
-                Label("Test Launch", systemImage: "arrow.up.forward.app")
+            if item.kind == .app, item.launchURL != nil {
+                Button {
+                    Task { await testLaunch(item) }
+                } label: {
+                    Label("Test Launch", systemImage: "arrow.up.forward.app")
+                }
             }
 
-            if let index = model.items.firstIndex(where: { $0.id == item.id }) {
+            // Where it lives. Folders are never inside anything, so they are
+            // the one kind this does not offer.
+            if !item.isFolder, !model.allItems.folders.isEmpty {
+                Menu {
+                    Button("Main Launcher") { model.setParent(of: item.id, to: nil) }
+                        .disabled(item.parentFolderID == nil)
+                    ForEach(model.allItems.folders) { folder in
+                        Button(folder.name) { model.setParent(of: item.id, to: folder.id) }
+                            .disabled(item.parentFolderID == folder.id)
+                    }
+                } label: {
+                    Label("Move To…", systemImage: "folder")
+                }
+            }
+
+            // Reordering happens within the item's own scope: moving something
+            // up inside a folder must not shuffle the wall behind it.
+            let scope = item.parentFolderID.map { model.children(of: $0) } ?? model.allItems.rootItems
+            if let index = scope.firstIndex(where: { $0.id == item.id }) {
                 Button {
-                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1)
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1, in: item.parentFolderID)
                 } label: {
                     Label("Move Up", systemImage: "arrow.up")
                 }
@@ -189,11 +242,11 @@ struct SettingsSheet: View {
                 .accessibilityIdentifier(AccessibilityID.appRowMoveUp(item.name))
 
                 Button {
-                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2)
+                    model.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2, in: item.parentFolderID)
                 } label: {
                     Label("Move Down", systemImage: "arrow.down")
                 }
-                .disabled(index >= model.items.count - 1)
+                .disabled(index >= scope.count - 1)
                 .accessibilityIdentifier(AccessibilityID.appRowMoveDown(item.name))
             }
 
@@ -309,7 +362,7 @@ struct SettingsSheet: View {
         }
     }
 
-    private var librarySection: some View {
+    private var maintenanceSection: some View {
         Section {
             Button {
                 model.restoreDemoApps()
@@ -321,14 +374,14 @@ struct SettingsSheet: View {
             Button(role: .destructive) {
                 isConfirmingRemoveAll = true
             } label: {
-                Label("Remove All Apps", systemImage: "trash")
+                Label("Remove Everything", systemImage: "trash")
             }
-            .disabled(model.items.isEmpty)
+            .disabled(model.allItems.isEmpty)
             .accessibilityIdentifier(AccessibilityID.removeAllApps)
         } header: {
             Text("Library")
         } footer: {
-            Text("Restoring demo apps replaces everything in the launcher with the five sample tiles. Demo tiles are placeholders — nothing on this iPad answers their links.")
+            Text("Restoring demo apps replaces everything in your library — apps, websites and folders — with the five sample tiles. Demo tiles are placeholders; nothing on this iPad answers their links.")
         }
     }
 
@@ -341,6 +394,19 @@ struct SettingsSheet: View {
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private func deleteMessage(for item: LauncherItem) -> String {
+        switch item.kind {
+        case .folder:
+            let count = model.itemCount(inFolder: item.id)
+            guard count > 0 else { return "\(item.name) will be removed. It is empty." }
+            return "\(item.name) will be removed. The \(count == 1 ? "item" : "\(count) items") inside it move back to the main launcher — nothing is deleted."
+        case .website:
+            return "\(item.name) will be removed from your launcher. The website itself is unaffected."
+        case .app:
+            return "\(item.name) will be removed from your launcher. The app itself stays installed."
         }
     }
 
@@ -359,27 +425,39 @@ struct SettingsSheet: View {
     }
 
     private func testLaunch(_ item: LauncherItem) async {
-        let opened = await model.testLaunch(item.launchURL)
-        testLaunchResult = TestLaunchResult(succeeded: opened, name: item.name, url: item.launchURL)
+        guard let launchURL = item.launchURL else { return }
+        let opened = await model.testLaunch(launchURL)
+        testLaunchResult = TestLaunchResult(succeeded: opened, name: item.name, url: launchURL)
     }
 }
 
 /// What the editor should be doing when it appears.
 enum EditorTarget: Hashable, Identifiable {
     case add
+    case addFolder
     case edit(LauncherItem)
 
     var id: String {
         switch self {
         case .add: return "add"
+        case .addFolder: return "addFolder"
         case .edit(let item): return "edit-\(item.id.uuidString)"
         }
     }
 
     var existingItem: LauncherItem? {
         switch self {
-        case .add: return nil
+        case .add, .addFolder: return nil
         case .edit(let item): return item
+        }
+    }
+
+    /// What a *new* entry starts life as. Ignored when editing, where the kind
+    /// comes from the entry itself.
+    var newItemKind: LauncherItemKind {
+        switch self {
+        case .addFolder: return .folder
+        case .add, .edit: return .app
         }
     }
 }

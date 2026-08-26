@@ -27,13 +27,29 @@ struct LauncherScreen: View {
                 let layout = LauncherLayout(size: proxy.size)
 
                 ZStack {
+                    // A folder lights a pane of glass over the wall rather than
+                    // replacing it, so the environment stays visible behind.
+                    if let folder = model.openFolder {
+                        FolderStageView(
+                            folder: folder,
+                            itemCount: model.itemCount(inFolder: folder.id),
+                            isEmpty: model.isEmpty,
+                            onClose: { withAnimation(motion.transition) { model.closeFolder() } }
+                        )
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    }
+
                     stage(layout: layout)
-                    settingsButton
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(.trailing, layout.isCompact ? 16 : 26)
-                        .padding(.top, layout.isCompact ? 12 : 18)
+
+                    if model.openFolder == nil {
+                        settingsButton
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .padding(.trailing, layout.isCompact ? 16 : 26)
+                            .padding(.top, layout.isCompact ? 12 : 18)
+                    }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
+                .animation(motion.transition, value: model.openFolderID)
             }
         }
         .background(HoloTheme.backgroundDeep.ignoresSafeArea())
@@ -45,6 +61,11 @@ struct LauncherScreen: View {
         .onKeyPress(.rightArrow) { moveSelection(by: 1); return .handled }
         .onKeyPress(.return) { activateSelected(); return .handled }
         .onKeyPress(.space) { activateSelected(); return .handled }
+        .onKeyPress(.escape) {
+            guard model.isFolderOpen else { return .ignored }
+            withAnimation(motion.transition) { model.closeFolder() }
+            return .handled
+        }
         .onAppear { isStageFocused = true }
         // The camera and the microphone run only while the launcher is on
         // screen, switched on, and the scene is active — never behind Settings,
@@ -53,6 +74,7 @@ struct LauncherScreen: View {
         .onChange(of: clapToOpenEnabled, initial: true) { _, _ in updateClapListening() }
         .onChange(of: motion.isSceneActive) { _, _ in updateAmbientInput() }
         .onChange(of: isSettingsPresented) { _, _ in updateAmbientInput() }
+        .onChange(of: model.browsing?.id) { _, _ in updateAmbientInput() }
         .onDisappear {
             services.airGestures.stop()
             services.claps.stop()
@@ -61,6 +83,14 @@ struct LauncherScreen: View {
             SettingsSheet(initialRoute: settingsRoute)
                 .environment(model)
                 .environment(motion)
+        }
+        .fullScreenCover(item: browsingBinding) { session in
+            HoloBrowserHost(
+                session: session,
+                launcher: services.launcher,
+                onClose: { model.closeBrowser() }
+            )
+            .environment(motion)
         }
         .alert(
             failureTitle(for: model.launchFailure),
@@ -137,6 +167,7 @@ struct LauncherScreen: View {
                 selectedID: nonClearingSelectionBinding,
                 tileSize: layout.tileSize,
                 launchProgress: model.launchProgress,
+                folderCounts: model.folderCounts,
                 onActivate: { item in
                     Task { await model.activate(item, animation: motion.transition) }
                 }
@@ -164,7 +195,7 @@ struct LauncherScreen: View {
                 .minimumScaleFactor(0.6)
                 .accessibilityIdentifier(AccessibilityID.selectedAppName)
 
-            Text("TAP TO OPEN")
+            Text(captionForSelection)
                 .font(.system(size: layout.captionFontSize, weight: .semibold, design: .rounded))
                 .tracking(2.6)
                 .foregroundStyle(HoloTheme.secondaryText.opacity(0.8))
@@ -172,6 +203,26 @@ struct LauncherScreen: View {
         }
         .padding(.top, layout.captionSpacing)
         .animation(motion.transition, value: model.selectedID)
+    }
+
+    /// What the caption under the wall says. A folder does not "open" anywhere,
+    /// and a website opens here rather than somewhere else; saying so is the
+    /// only warning the user gets before a tile behaves differently.
+    private var captionForSelection: String {
+        switch model.selectedItem?.kind {
+        case .folder: return "TAP TO OPEN FOLDER"
+        case .website: return "TAP TO BROWSE"
+        case .app, .none: return "TAP TO OPEN"
+        }
+    }
+
+    /// The browser is presented from the model's session, but `fullScreenCover`
+    /// wants a binding it can clear when the user swipes it away.
+    private var browsingBinding: Binding<BrowsingSession?> {
+        Binding(
+            get: { model.browsing },
+            set: { model.browsing = $0 }
+        )
     }
 
     private var settingsButton: some View {
@@ -215,7 +266,7 @@ struct LauncherScreen: View {
 
     /// Whether the launcher is in a position to be watching or listening at all.
     private var isForeground: Bool {
-        motion.isSceneActive && !isSettingsPresented
+        motion.isSceneActive && !isSettingsPresented && model.browsing == nil
     }
 
     private func updateAirGestures() {

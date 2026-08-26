@@ -30,8 +30,9 @@ final class DemoContentTests: XCTestCase {
         for draft in drafts {
             XCTAssertTrue(draft.isDemo)
             XCTAssertFalse(draft.name.isEmpty)
-            guard case .success = LaunchURLValidator.validate(draft.launchURL.absoluteString) else {
-                return XCTFail("\(draft.launchURL) should be a valid launch link")
+            guard let launchURL = draft.launchURL,
+                  case .success = LaunchURLValidator.validate(launchURL.absoluteString) else {
+                return XCTFail("\(String(describing: draft.launchURL)) should be a valid launch link")
             }
         }
     }

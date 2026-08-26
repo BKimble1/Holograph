@@ -20,6 +20,8 @@ struct HolographicCarousel: View {
     @Binding var selectedID: UUID?
     let tileSize: CGFloat
     let launchProgress: Double
+    /// How many things each folder holds, so a folder tile can say so out loud.
+    var folderCounts: [UUID: Int] = [:]
     let onActivate: (LauncherItem) -> Void
 
     @Environment(HoloMotion.self) private var motion
@@ -119,11 +121,36 @@ struct HolographicCarousel: View {
         .onTapGesture { onActivate(item) }
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier(AccessibilityID.carouselItem(item.name))
-        .accessibilityLabel(item.name)
+        .accessibilityLabel(Self.label(for: item, folderCount: folderCounts[item.id] ?? 0))
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityHint(isSelected ? "Opens \(item.name)." : "Brings \(item.name) to the centre.")
+        .accessibilityHint(isSelected ? Self.hint(for: item) : "Brings \(item.name) to the centre.")
         .accessibilityAction(named: isSelected ? "Open" : "Bring to centre") { onActivate(item) }
+    }
+}
+
+// MARK: - What VoiceOver says
+
+extension HolographicCarousel {
+    /// "CoreCredit, app", "GitHub, website", "Work, folder, 4 items". The kind
+    /// matters here more than anywhere: a tile gives no other clue whether
+    /// activating it will leave Holograph or stay inside it.
+    nonisolated static func label(for item: LauncherItem, folderCount: Int) -> String {
+        switch item.kind {
+        case .folder:
+            let count = folderCount == 1 ? "1 item" : "\(folderCount) items"
+            return "\(item.name), folder, \(count)"
+        case .app, .website:
+            return "\(item.name), \(item.kind.noun)"
+        }
+    }
+
+    nonisolated static func hint(for item: LauncherItem) -> String {
+        switch item.kind {
+        case .app: return "Opens \(item.name)."
+        case .website: return "Opens \(item.name) in Holograph."
+        case .folder: return "Opens the \(item.name) folder."
+        }
     }
 }
 

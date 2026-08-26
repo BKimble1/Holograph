@@ -15,10 +15,20 @@ final class AppEditorViewModel {
         case failed(String)
     }
 
+    /// What is being made. Chosen up front for a new entry, and fixed once an
+    /// entry exists — a website is not an app that changed its mind.
+    var kind: LauncherItemKind
     var name: String
     var launchURLText: String
+    var websiteURLText: String
     var fallbackURLText: String
     var appStoreLinkText: String = ""
+    /// Which folder this belongs to, or `nil` for the root wall. Folders
+    /// themselves are never inside anything.
+    var parentFolderID: UUID?
+    /// The folders available to put this in, supplied by whoever presents the
+    /// editor so this stays free of the repository.
+    var availableFolders: [LauncherItem] = []
 
     private(set) var iconData: Data?
     private(set) var iconError: String?
@@ -37,13 +47,22 @@ final class AppEditorViewModel {
 
     init(
         item: LauncherItem?,
+        kind: LauncherItemKind = .app,
+        availableFolders: [LauncherItem] = [],
         iconProcessor: IconProcessor,
         metadataProvider: AppStoreMetadataProviding
     ) {
         self.existingItem = item
+        self.kind = item?.kind ?? kind
         self.name = item?.name ?? ""
-        self.launchURLText = item?.launchURL.absoluteString ?? ""
+        // One field per kind rather than one shared one: the two are validated
+        // differently, and a half-typed app scheme should not survive into a
+        // website that will not accept it.
+        self.launchURLText = item?.kind == .website ? "" : (item?.launchURL?.absoluteString ?? "")
+        self.websiteURLText = item?.kind == .website ? (item?.launchURL?.absoluteString ?? "") : ""
         self.fallbackURLText = item?.fallbackURL?.absoluteString ?? ""
+        self.parentFolderID = item?.parentFolderID
+        self.availableFolders = availableFolders
         self.iconData = item?.iconData
         self.iconProcessor = iconProcessor
         self.metadataProvider = metadataProvider
@@ -51,7 +70,20 @@ final class AppEditorViewModel {
 
     var isEditing: Bool { existingItem != nil }
 
-    var title: String { isEditing ? "Edit App" : "Add App" }
+    /// The kind cannot change under an existing entry: its stored URL was
+    /// validated as one thing, and quietly reinterpreting it as another is how
+    /// a launcher ends up with a tile that opens nothing.
+    var canChooseKind: Bool { !isEditing && kind != .folder }
+
+    var title: String {
+        switch (isEditing, kind) {
+        case (true, .app): return "Edit App"
+        case (true, .website): return "Edit Website"
+        case (true, .folder): return "Edit Folder"
+        case (false, .folder): return "New Folder"
+        case (false, _): return "Add to Holograph"
+        }
+    }
 
     // MARK: - Validation
 
@@ -59,17 +91,36 @@ final class AppEditorViewModel {
 
     var nameError: String? {
         guard trimmedName.isEmpty else { return nil }
-        return "Give this app a name."
+        switch kind {
+        case .app: return "Give this app a name."
+        case .website: return "Give this website a name."
+        case .folder: return "Give this folder a name."
+        }
     }
 
     var launchURLError: String? {
+        guard kind == .app else { return nil }
         if case .failure(let error) = LaunchURLValidator.validate(launchURLText) {
             return error.errorDescription
         }
         return nil
     }
 
+    var websiteURLError: String? {
+        guard kind == .website else { return nil }
+        if case .failure(let error) = WebsiteURLValidator.validate(websiteURLText) {
+            return error.errorDescription
+        }
+        return nil
+    }
+
+    var validatedWebsiteURL: URL? {
+        if case .success(let url) = WebsiteURLValidator.validate(websiteURLText) { return url }
+        return nil
+    }
+
     var fallbackURLError: String? {
+        guard kind == .app else { return nil }
         if case .failure(let error) = LaunchURLValidator.validateFallback(fallbackURLText) {
             return error.errorDescription
         }
@@ -87,18 +138,30 @@ final class AppEditorViewModel {
     }
 
     var canSave: Bool {
-        nameError == nil && launchURLError == nil && fallbackURLError == nil
+        nameError == nil && launchURLError == nil && websiteURLError == nil && fallbackURLError == nil
+    }
+
+    /// Where this entry will actually send the user, or `nil` for a folder.
+    var destinationURL: URL? {
+        switch kind {
+        case .app: return validatedLaunchURL
+        case .website: return validatedWebsiteURL
+        case .folder: return nil
+        }
     }
 
     /// Returns a draft when everything checks out, otherwise turns the inline
     /// validation on and returns `nil`.
     func makeDraft() -> LauncherItemDraft? {
         showsValidation = true
-        guard canSave, let launchURL = validatedLaunchURL else { return nil }
+        guard canSave else { return nil }
+        if kind != .folder, destinationURL == nil { return nil }
         return LauncherItemDraft(
+            kind: kind,
             name: trimmedName,
-            launchURL: launchURL,
-            fallbackURL: validatedFallbackURL,
+            launchURL: destinationURL,
+            fallbackURL: kind == .app ? validatedFallbackURL : nil,
+            parentFolderID: kind == .folder ? nil : parentFolderID,
             iconData: iconData,
             // Editing a demo entry makes it the user's own.
             isDemo: false
@@ -109,10 +172,19 @@ final class AppEditorViewModel {
     var previewItem: LauncherItem {
         LauncherItem(
             id: existingItem?.id ?? UUID(),
-            name: trimmedName.isEmpty ? "New App" : trimmedName,
-            launchURL: validatedLaunchURL ?? URL(string: "idlery-launcher://preview") ?? URL(fileURLWithPath: "/"),
+            kind: kind,
+            name: trimmedName.isEmpty ? placeholderName : trimmedName,
+            launchURL: destinationURL,
             iconData: iconData
         )
+    }
+
+    private var placeholderName: String {
+        switch kind {
+        case .app: return "New App"
+        case .website: return "New Website"
+        case .folder: return "New Folder"
+        }
     }
 
     // MARK: - Icon import
@@ -136,6 +208,9 @@ final class AppEditorViewModel {
     }
 
     // MARK: - App Store prefill
+
+    /// Only apps come from the App Store.
+    var showsAppStorePrefill: Bool { kind == .app }
 
     var canLookUpAppStoreLink: Bool {
         AppStoreURLParser.appID(from: appStoreLinkText) != nil

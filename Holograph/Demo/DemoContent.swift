@@ -102,6 +102,7 @@ extension LauncherItem {
     static func previewItems() -> [LauncherItem] {
         DemoContent.draftsWithoutIcons().enumerated().compactMap { index, draft in
             LauncherItem(
+                kind: draft.kind,
                 name: draft.name,
                 launchURL: draft.launchURL,
                 fallbackURL: draft.fallbackURL,

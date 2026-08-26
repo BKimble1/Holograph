@@ -48,7 +48,7 @@ final class AppEditorViewModelTests: XCTestCase {
 
         let draft = editor.makeDraft()
         XCTAssertEqual(draft?.name, "OffRent")
-        XCTAssertEqual(draft?.launchURL.absoluteString, "idler-offrent://launch")
+        XCTAssertEqual(draft?.launchURL?.absoluteString, "idler-offrent://launch")
         XCTAssertNil(draft?.fallbackURL)
     }
 

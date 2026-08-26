@@ -97,3 +97,65 @@ enum LaunchURLValidator {
         }
     }
 }
+
+// MARK: - Websites
+
+/// Why a website address cannot be used.
+enum WebsiteURLValidationError: LocalizedError, Equatable {
+    case empty
+    case malformed
+    case notWeb(String)
+    case missingHost
+
+    var errorDescription: String? {
+        switch self {
+        case .empty:
+            return "Enter a website address."
+        case .malformed:
+            return "That address isn’t formatted correctly."
+        case .notWeb(let scheme):
+            return "“\(scheme)” isn’t a website. Use http:// or https://."
+        case .missingHost:
+            return "Include a domain, for example https://example.com."
+        }
+    }
+}
+
+/// Validates the addresses that become website tiles.
+///
+/// Stricter than `LaunchURLValidator` on purpose. A website tile opens inside
+/// Holograph's own web view, and only `http` and `https` mean anything there —
+/// a custom scheme would be an app, a `javascript:` or `data:` URL is a way to
+/// run something unexpected, and neither belongs behind a tile that says it is
+/// a website.
+enum WebsiteURLValidator {
+    static let allowedSchemes: Set<String> = ["http", "https"]
+
+    /// Adds `https://` to a bare domain, which is what people type.
+    static func normalize(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        guard !trimmed.contains("://") else { return trimmed }
+        if let colon = trimmed.firstIndex(of: ":"),
+           LaunchURLValidator.isValidScheme(String(trimmed[trimmed.startIndex..<colon])) {
+            return trimmed
+        }
+        return "https://" + trimmed
+    }
+
+    static func validate(_ raw: String) -> Result<URL, WebsiteURLValidationError> {
+        let normalized = normalize(raw)
+        guard !normalized.isEmpty else { return .failure(.empty) }
+        guard !normalized.contains(" ") else { return .failure(.malformed) }
+        guard let components = URLComponents(string: normalized) else { return .failure(.malformed) }
+        guard let scheme = components.scheme?.lowercased(), !scheme.isEmpty else {
+            return .failure(.malformed)
+        }
+        guard allowedSchemes.contains(scheme) else { return .failure(.notWeb(scheme)) }
+        guard let host = components.host, !host.isEmpty, host.contains(".") else {
+            return .failure(.missingHost)
+        }
+        guard let url = components.url else { return .failure(.malformed) }
+        return .success(url)
+    }
+}

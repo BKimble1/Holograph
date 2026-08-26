@@ -14,10 +14,12 @@ struct AppEditorView: View {
     @Environment(LauncherViewModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    init(target: EditorTarget, services: AppServices) {
+    init(target: EditorTarget, services: AppServices, folders: [LauncherItem] = []) {
         _editor = State(
             initialValue: AppEditorViewModel(
                 item: target.existingItem,
+                kind: target.newItemKind,
+                availableFolders: folders,
                 iconProcessor: services.iconProcessor,
                 metadataProvider: services.metadataProvider
             )
@@ -27,10 +29,12 @@ struct AppEditorView: View {
     var body: some View {
         Form {
             previewSection
+            if editor.canChooseKind { kindSection }
             detailsSection
+            if editor.kind != .folder { folderSection }
             iconSection
-            appStoreSection
-            testSection
+            if editor.showsAppStorePrefill { appStoreSection }
+            if editor.kind == .app { testSection }
         }
         .scrollContentBackground(.hidden)
         .navigationTitle(editor.title)
@@ -106,34 +110,102 @@ struct AppEditorView: View {
         }
     }
 
+    /// App or website. Two kinds, one picker, and the form below it changes to
+    /// suit — rather than two near-identical editors to keep in step.
+    private var kindSection: some View {
+        Section {
+            Picker("Kind", selection: $editor.kind) {
+                Text("App").tag(LauncherItemKind.app)
+                Text("Website").tag(LauncherItemKind.website)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier(AccessibilityID.editorKind)
+        } footer: {
+            Text(editor.kind == .app
+                 ? "An app opens outside Holograph, using the link it registers with iPadOS."
+                 : "A website opens inside Holograph, in its own browser. You keep your place on the wall.")
+        }
+    }
+
     private var detailsSection: some View {
         Section {
             LabeledField(title: "Name", error: editor.showsValidation ? editor.nameError : nil) {
-                TextField("Field Notes", text: $editor.name)
+                TextField(namePlaceholder, text: $editor.name)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier(AccessibilityID.editorName)
             }
 
-            LabeledField(title: "Launch link", error: editor.showsValidation ? editor.launchURLError : nil) {
-                TextField("idler-offrent://launch", text: $editor.launchURLText)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier(AccessibilityID.editorLaunchURL)
-            }
+            switch editor.kind {
+            case .app:
+                LabeledField(title: "Launch link", error: editor.showsValidation ? editor.launchURLError : nil) {
+                    TextField("idler-offrent://launch", text: $editor.launchURLText)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier(AccessibilityID.editorLaunchURL)
+                }
 
-            LabeledField(title: "Fallback link (optional)", error: editor.showsValidation ? editor.fallbackURLError : nil) {
-                TextField("https://apps.apple.com/app/id000000000", text: $editor.fallbackURLText)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier(AccessibilityID.editorFallbackURL)
+                LabeledField(title: "Fallback link (optional)", error: editor.showsValidation ? editor.fallbackURLError : nil) {
+                    TextField("https://apps.apple.com/app/id000000000", text: $editor.fallbackURLText)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier(AccessibilityID.editorFallbackURL)
+                }
+            case .website:
+                LabeledField(title: "Website address", error: editor.showsValidation ? editor.websiteURLError : nil) {
+                    TextField("https://example.com", text: $editor.websiteURLText)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier(AccessibilityID.editorWebsiteURL)
+                }
+            case .folder:
+                EmptyView()
             }
         } header: {
             Text("Details")
         } footer: {
-            Text("The launch link is the URL scheme the target app registers, for example idler-offrent://launch. The fallback opens when that link isn’t available — an App Store page or website works well.")
+            Text(detailsFooter)
+        }
+    }
+
+    private var namePlaceholder: String {
+        switch editor.kind {
+        case .app: return "Field Notes"
+        case .website: return "Idlery"
+        case .folder: return "Work"
+        }
+    }
+
+    private var detailsFooter: String {
+        switch editor.kind {
+        case .app:
+            return "The launch link is the URL scheme the target app registers, for example idler-offrent://launch. The fallback opens when that link isn’t available — an App Store page or website works well."
+        case .website:
+            return "Website addresses must start with http:// or https://. Holograph opens them in its own browser and stays signed in between visits."
+        case .folder:
+            return "A folder holds apps and websites. Add things to it from the library list."
+        }
+    }
+
+    /// Where this entry lives: on the wall, or inside a folder.
+    private var folderSection: some View {
+        Section {
+            Picker("Folder", selection: $editor.parentFolderID) {
+                Text("Main launcher").tag(UUID?.none)
+                ForEach(editor.availableFolders) { folder in
+                    Text(folder.name).tag(UUID?.some(folder.id))
+                }
+            }
+            .accessibilityIdentifier(AccessibilityID.editorFolder)
+        } header: {
+            Text("Location")
+        } footer: {
+            Text(editor.availableFolders.isEmpty
+                 ? "Create a folder in Settings to group things together."
+                 : "Anything inside a folder is shown in that folder rather than on the main launcher.")
         }
     }
 
@@ -172,7 +244,7 @@ struct AppEditorView: View {
         } header: {
             Text("Icon")
         } footer: {
-            Text("Images are cropped to a square and resized so your library stays small. Without an icon the launcher shows the app’s initials.")
+            Text("Images are cropped to a square and resized so your library stays small. Without an icon the launcher shows its initials in the same holographic tile.")
         }
     }
 
@@ -298,6 +370,14 @@ private struct LabeledField<Content: View>: View {
     SheetPreviewHost { harness in
         NavigationStack {
             AppEditorView(target: .add, services: harness.services)
+        }
+    }
+}
+
+#Preview("New folder") {
+    SheetPreviewHost { harness in
+        NavigationStack {
+            AppEditorView(target: .addFolder, services: harness.services)
         }
     }
 }

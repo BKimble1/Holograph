@@ -51,7 +51,7 @@ struct EmptyLauncherView: View {
                     .padding(.top, -tileSize * 0.28)
 
                 VStack(spacing: 8) {
-                    Text("Add Your First App")
+                    Text("Add Your First Tile")
                         .font(.system(size: max(19, min(32, tileSize * 0.14)), weight: .medium, design: .rounded))
                         .foregroundStyle(.white)
                     Text("TAP TO OPEN SETTINGS")
@@ -63,7 +63,7 @@ struct EmptyLauncherView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(AccessibilityID.emptyStatePlaceholder)
-        .accessibilityLabel("Add your first app")
+        .accessibilityLabel("Add your first app, website or folder")
         .accessibilityHint("Opens Settings so you can add an app to the launcher.")
         .accessibilityAddTraits(.isButton)
     }

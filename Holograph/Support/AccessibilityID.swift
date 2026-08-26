@@ -36,6 +36,26 @@ enum AccessibilityID {
     static let editorTestLaunch = "editor.testLaunch"
     static let editorValidationMessage = "editor.validationMessage"
 
+    static let folderStage = "folder.stage"
+    static let folderTitle = "folder.title"
+    static let folderClose = "folder.close"
+    static let folderEmpty = "folder.empty"
+
+    static let browser = "browser.surface"
+    static let browserBack = "browser.back"
+    static let browserForward = "browser.forward"
+    static let browserReload = "browser.reload"
+    static let browserClose = "browser.close"
+    static let browserTitle = "browser.title"
+    static let browserFailure = "browser.failure"
+
+    static let addItem = "settings.addItem"
+    static let addFolder = "settings.addFolder"
+    static let headTracking = "settings.headTracking"
+    static let editorKind = "editor.kind"
+    static let editorWebsiteURL = "editor.websiteURL"
+    static let editorFolder = "editor.folder"
+
     static let launchFailureSheet = "launchFailure.sheet"
     static let launchFailureEdit = "launchFailure.edit"
     static let launchFailureFallback = "launchFailure.fallback"

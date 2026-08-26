@@ -11,6 +11,15 @@ struct LaunchFailure: Identifiable, Equatable {
     var canOfferFallback: Bool { item.fallbackURL != nil }
 }
 
+/// A website open inside Holograph. Identifiable so a sheet can be driven from
+/// it, and carrying the item so the browser can title itself before the page
+/// has loaded.
+struct BrowsingSession: Identifiable, Equatable, Sendable {
+    let id = UUID()
+    let item: LauncherItem
+    let url: URL
+}
+
 /// A non-blocking problem worth telling the user about (a failed save, a store
 /// that could not be read).
 struct LauncherAlert: Identifiable, Equatable {
@@ -27,10 +36,19 @@ struct LauncherAlert: Identifiable, Equatable {
 @MainActor
 @Observable
 final class LauncherViewModel {
+    /// Everything in the library, flat. Settings works from this; the wall does
+    /// not.
+    private(set) var allItems: [LauncherItem] = []
+    /// What the wall shows: the root scope, or the open folder's contents.
     private(set) var items: [LauncherItem] = []
     private(set) var isLaunching = false
     /// 0...1 while the portal effect plays.
     private(set) var launchProgress: Double = 0
+
+    /// The folder currently open over the wall, if any.
+    private(set) var openFolderID: UUID?
+    /// The website currently open in Holograph's own browser, if any.
+    var browsing: BrowsingSession?
 
     var launchFailure: LaunchFailure?
     var alert: LauncherAlert?
@@ -48,6 +66,8 @@ final class LauncherViewModel {
     private let selectionStore: SelectionStoring
     private let motion: HoloMotion
     private let logger = Logger(subsystem: "com.idlery.holograph", category: "launcher")
+    /// Where the wall was before a folder was opened over it.
+    private var rootSelectionBeforeFolder: UUID?
 
     init(
         repository: LauncherRepository,
@@ -69,6 +89,41 @@ final class LauncherViewModel {
 
     var isEmpty: Bool { items.isEmpty }
 
+    /// The folder open over the wall, if any.
+    var openFolder: LauncherItem? {
+        guard let openFolderID else { return nil }
+        return allItems.first { $0.id == openFolderID }
+    }
+
+    var isFolderOpen: Bool { openFolder != nil }
+
+    func children(of folderID: UUID) -> [LauncherItem] {
+        allItems.children(of: folderID)
+    }
+
+    /// How many things a folder holds, for its caption and its VoiceOver label.
+    /// How many things each folder holds, keyed by folder, for the wall's own
+    /// accessibility labels.
+    var folderCounts: [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for folder in allItems where folder.isFolder { counts[folder.id] = 0 }
+        for item in allItems {
+            guard let parent = item.parentFolderID, counts[parent] != nil else { continue }
+            counts[parent, default: 0] += 1
+        }
+        return counts
+    }
+
+    func itemCount(inFolder id: UUID) -> Int {
+        allItems.reduce(into: 0) { $0 += ($1.parentFolderID == id ? 1 : 0) }
+    }
+
+    /// What the wall should be showing right now.
+    private var visibleScope: [LauncherItem] {
+        if let openFolderID { return allItems.children(of: openFolderID) }
+        return allItems.rootItems
+    }
+
     var selectedIndex: Int? {
         guard let selectedID else { return nil }
         return items.firstIndex { $0.id == selectedID }
@@ -83,15 +138,20 @@ final class LauncherViewModel {
 
     func load() {
         do {
-            items = try repository.fetchAll()
+            allItems = try repository.fetchAll()
         } catch {
             logger.error("Fetch failed: \(error.localizedDescription, privacy: .public)")
-            items = []
+            allItems = []
             alert = LauncherAlert(
                 title: "Couldn’t open your library",
                 message: error.localizedDescription
             )
         }
+        // A folder that no longer exists cannot stay open over the wall.
+        if let openFolderID, !allItems.contains(where: { $0.id == openFolderID && $0.isFolder }) {
+            self.openFolderID = nil
+        }
+        items = visibleScope
         restoreSelectionIfPossible()
     }
 
@@ -117,12 +177,16 @@ final class LauncherViewModel {
         let previousIndex = selectedIndex
 
         do {
-            items = try repository.fetchAll()
+            allItems = try repository.fetchAll()
         } catch {
             logger.error("Reload failed: \(error.localizedDescription, privacy: .public)")
-            alert = LauncherAlert(title: "Couldn’t reload your apps", message: error.localizedDescription)
+            alert = LauncherAlert(title: "Couldn’t reload your library", message: error.localizedDescription)
             return
         }
+        if let openFolderID, !allItems.contains(where: { $0.id == openFolderID && $0.isFolder }) {
+            self.openFolderID = nil
+        }
+        items = visibleScope
 
         guard !items.isEmpty else {
             updateSelection(nil)
@@ -144,7 +208,10 @@ final class LauncherViewModel {
         guard selectedID != id else { return }
         let wasSelected = selectedID != nil
         selectedID = id
-        selectionStore.saveSelection(id)
+        // Only the wall's own selection is worth remembering between launches;
+        // a tile inside a folder would be restored into a scope that is not
+        // showing.
+        if openFolderID == nil { selectionStore.saveSelection(id) }
         if wasSelected, id != nil {
             feedback.selectionChanged()
             sound.selectionTick()
@@ -181,6 +248,31 @@ final class LauncherViewModel {
         }
     }
 
+    // MARK: - Folders
+
+    /// Opens a folder over the wall. The wall keeps its own selection so
+    /// closing puts the user back exactly where they were.
+    func openFolder(_ id: UUID) {
+        guard let folder = allItems.first(where: { $0.id == id && $0.isFolder }) else { return }
+        guard openFolderID == nil else { return }
+        rootSelectionBeforeFolder = selectedID
+        openFolderID = folder.id
+        items = visibleScope
+        selectedID = nil
+        updateSelection(items.first?.id)
+    }
+
+    func closeFolder() {
+        guard openFolderID != nil else { return }
+        openFolderID = nil
+        items = visibleScope
+        selectedID = nil
+        // Back to the folder tile the user came from, not to wherever the
+        // carousel happens to land.
+        updateSelection(rootSelectionBeforeFolder ?? items.first?.id)
+        rootSelectionBeforeFolder = nil
+    }
+
     // MARK: - Launching
 
     func launchSelected() async {
@@ -189,6 +281,34 @@ final class LauncherViewModel {
     }
 
     private func performLaunch(of item: LauncherItem) async {
+        switch item.activation {
+        case .openFolder(let id):
+            // A folder stays inside Holograph, so it gets the tick rather than
+            // the launch ceremony and the announcement.
+            feedback.selectionChanged()
+            withAnimation(motion.transition) { openFolder(id) }
+        case .openInHolograph(let url):
+            await presentInHolograph(item, url: url)
+        case .openExternally:
+            await leaveForAnotherApp(item)
+        case .unavailable:
+            feedback.failure()
+            launchFailure = LaunchFailure(item: item)
+        }
+    }
+
+    /// A website: the same ceremony, but Holograph keeps the user.
+    private func presentInHolograph(_ item: LauncherItem, url: URL) async {
+        isLaunching = true
+        feedback.launchImpact()
+        sound.announceLaunch(of: item.name)
+        await runPortalCeremony()
+        finishCeremony()
+        isLaunching = false
+        browsing = BrowsingSession(item: item, url: url)
+    }
+
+    private func leaveForAnotherApp(_ item: LauncherItem) async {
         isLaunching = true
         feedback.launchImpact()
         // Spoken as the portal opens rather than after it: the ceremony and the
@@ -210,6 +330,11 @@ final class LauncherViewModel {
             feedback.failure()
             launchFailure = LaunchFailure(item: item)
         }
+    }
+
+    /// Closing the Holo Browser. The wall is exactly as it was left.
+    func closeBrowser() {
+        browsing = nil
     }
 
     /// Used by the "Open Fallback" recovery action.
@@ -252,7 +377,7 @@ final class LauncherViewModel {
     // MARK: - Library editing
 
     func add(_ draft: LauncherItemDraft) {
-        perform("Couldn’t add that app") {
+        perform("Couldn’t add that item") {
             let added = try repository.add(draft)
             reloadPreservingSelection()
             select(added.id)
@@ -267,21 +392,29 @@ final class LauncherViewModel {
     }
 
     func delete(id: UUID) {
-        perform("Couldn’t delete that app") {
+        perform("Couldn’t delete that item") {
             try repository.delete(id: id)
             reloadPreservingSelection()
         }
     }
 
-    func move(fromOffsets source: IndexSet, toOffset destination: Int) {
-        perform("Couldn’t reorder your apps") {
-            try repository.move(fromOffsets: source, toOffset: destination)
+    func move(fromOffsets source: IndexSet, toOffset destination: Int, in parent: UUID? = nil) {
+        perform("Couldn’t reorder your library") {
+            try repository.move(fromOffsets: source, toOffset: destination, in: parent)
+            reloadPreservingSelection()
+        }
+    }
+
+    /// Moves an app or website between the root wall and a folder.
+    func setParent(of id: UUID, to parent: UUID?) {
+        perform("Couldn’t move that item") {
+            try repository.setParent(of: id, to: parent)
             reloadPreservingSelection()
         }
     }
 
     func removeAll() {
-        perform("Couldn’t remove your apps") {
+        perform("Couldn’t remove your library") {
             try repository.removeAll()
             reloadPreservingSelection()
         }

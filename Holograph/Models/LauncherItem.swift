@@ -1,15 +1,45 @@
 import Foundation
 
-/// A launchable app as the UI sees it.
+/// What a tile on the wall actually is.
+///
+/// Three kinds, and no more: an app the system opens, a website Holograph opens
+/// inside itself, and a folder that holds either. Folders deliberately cannot
+/// contain folders — one level is what a launcher this size needs, and nesting
+/// buys complexity nobody asked for.
+enum LauncherItemKind: String, Codable, Sendable, CaseIterable {
+    case app
+    case website
+    case folder
+
+    /// How VoiceOver names it, and how Settings labels it.
+    var noun: String {
+        switch self {
+        case .app: return "app"
+        case .website: return "website"
+        case .folder: return "folder"
+        }
+    }
+
+    /// Whether an item of this kind is opened by leaving Holograph.
+    var leavesHolograph: Bool { self == .app }
+}
+
+/// A tile as the UI sees it.
 ///
 /// This is a plain, `Sendable` snapshot of a persisted record. Views and view
 /// models never touch SwiftData objects directly, which keeps the UI layer free
 /// of persistence concerns and makes previews and tests trivial.
 struct LauncherItem: Identifiable, Hashable, Sendable {
     let id: UUID
+    var kind: LauncherItemKind
     var name: String
-    var launchURL: URL
+    /// Where activating this sends the user. Always `nil` for a folder, which
+    /// goes nowhere — it opens in place — and never `nil` for anything else.
+    var launchURL: URL?
     var fallbackURL: URL?
+    /// The folder this belongs to, or `nil` when it sits on the root wall.
+    var parentFolderID: UUID?
+    /// Position within its own scope: the root wall, or one folder.
     var sortOrder: Int
     var iconData: Data?
     var isDemo: Bool
@@ -18,9 +48,11 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
 
     init(
         id: UUID = UUID(),
+        kind: LauncherItemKind = .app,
         name: String,
-        launchURL: URL,
+        launchURL: URL? = nil,
         fallbackURL: URL? = nil,
+        parentFolderID: UUID? = nil,
         sortOrder: Int = 0,
         iconData: Data? = nil,
         isDemo: Bool = false,
@@ -28,9 +60,11 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
         modifiedAt: Date = .init(timeIntervalSinceReferenceDate: 0)
     ) {
         self.id = id
+        self.kind = kind
         self.name = name
         self.launchURL = launchURL
         self.fallbackURL = fallbackURL
+        self.parentFolderID = parentFolderID
         self.sortOrder = sortOrder
         self.iconData = iconData
         self.isDemo = isDemo
@@ -47,36 +81,63 @@ struct LauncherItem: Identifiable, Hashable, Sendable {
         return initials.isEmpty ? "?" : initials.uppercased()
     }
 
+    var isFolder: Bool { kind == .folder }
+    var isWebsite: Bool { kind == .website }
+
     /// A short, human readable description of where this item will send the user.
     var launchTargetDescription: String {
-        if let scheme = launchURL.scheme, !scheme.isEmpty {
-            return "\(scheme)://"
+        guard let launchURL else { return "this folder" }
+        switch kind {
+        case .website:
+            return launchURL.host() ?? launchURL.absoluteString
+        case .app, .folder:
+            if let scheme = launchURL.scheme, !scheme.isEmpty {
+                return "\(scheme)://"
+            }
+            return launchURL.absoluteString
         }
-        return launchURL.absoluteString
+    }
+
+    /// What Settings shows under the name. A folder has no link, so it says how
+    /// much is in it instead — filled in by the caller, which is the only thing
+    /// that knows.
+    func subtitle(folderCount: Int = 0) -> String {
+        switch kind {
+        case .folder:
+            return folderCount == 1 ? "1 item" : "\(folderCount) items"
+        case .app, .website:
+            return launchURL?.absoluteString ?? ""
+        }
     }
 }
 
 /// The editable payload used to create or update a `LauncherItem`.
 ///
 /// URLs are already validated by the time a draft reaches the repository — see
-/// `LaunchURLValidator`.
+/// `LaunchURLValidator` and `WebsiteURLValidator`.
 struct LauncherItemDraft: Hashable, Sendable {
+    var kind: LauncherItemKind
     var name: String
-    var launchURL: URL
+    var launchURL: URL?
     var fallbackURL: URL?
+    var parentFolderID: UUID?
     var iconData: Data?
     var isDemo: Bool
 
     init(
+        kind: LauncherItemKind = .app,
         name: String,
-        launchURL: URL,
+        launchURL: URL? = nil,
         fallbackURL: URL? = nil,
+        parentFolderID: UUID? = nil,
         iconData: Data? = nil,
         isDemo: Bool = false
     ) {
+        self.kind = kind
         self.name = name
         self.launchURL = launchURL
         self.fallbackURL = fallbackURL
+        self.parentFolderID = parentFolderID
         self.iconData = iconData
         self.isDemo = isDemo
     }
@@ -85,11 +146,37 @@ struct LauncherItemDraft: Hashable, Sendable {
 extension LauncherItem {
     var draft: LauncherItemDraft {
         LauncherItemDraft(
+            kind: kind,
             name: name,
             launchURL: launchURL,
             fallbackURL: fallbackURL,
+            parentFolderID: parentFolderID,
             iconData: iconData,
             isDemo: isDemo
         )
+    }
+}
+
+// MARK: - Scoping
+
+extension Array where Element == LauncherItem {
+    /// What the main wall shows: everything that is not tucked inside a folder.
+    var rootItems: [LauncherItem] {
+        filter { $0.parentFolderID == nil }.sortedForDisplay()
+    }
+
+    /// What one folder holds.
+    func children(of folderID: UUID) -> [LauncherItem] {
+        filter { $0.parentFolderID == folderID }.sortedForDisplay()
+    }
+
+    /// Only the folders, for the "move into…" pickers.
+    var folders: [LauncherItem] {
+        filter(\.isFolder).sortedForDisplay()
+    }
+
+    /// Ordering is per scope, so the same rule is applied after every filter.
+    func sortedForDisplay() -> [LauncherItem] {
+        sorted { ($0.sortOrder, $0.createdAt) < ($1.sortOrder, $1.createdAt) }
     }
 }

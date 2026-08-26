@@ -51,7 +51,7 @@ final class LauncherRepositoryTests: XCTestCase {
 
             let item = try XCTUnwrap(repository.fetchAll().first, label)
             XCTAssertEqual(item.name, "After", label)
-            XCTAssertEqual(item.launchURL.absoluteString, "idlery-after://go", label)
+            XCTAssertEqual(item.launchURL?.absoluteString, "idlery-after://go", label)
             XCTAssertEqual(item.fallbackURL?.absoluteString, "https://example.com", label)
             XCTAssertEqual(item.iconData, iconData, label)
         }
@@ -89,7 +89,7 @@ final class LauncherRepositoryTests: XCTestCase {
             }
 
             // Move "D" to the front.
-            try repository.move(fromOffsets: IndexSet(integer: 3), toOffset: 0)
+            try repository.move(fromOffsets: IndexSet(integer: 3), toOffset: 0, in: nil)
 
             let items = try repository.fetchAll()
             XCTAssertEqual(items.map(\.name), ["D", "A", "B", "C"], label)
@@ -104,7 +104,7 @@ final class LauncherRepositoryTests: XCTestCase {
             }
 
             // SwiftUI's "move down one" is toOffset: index + 2.
-            try repository.move(fromOffsets: IndexSet(integer: 0), toOffset: 2)
+            try repository.move(fromOffsets: IndexSet(integer: 0), toOffset: 2, in: nil)
 
             XCTAssertEqual(try repository.fetchAll().map(\.name), ["B", "A", "C"], label)
         }
